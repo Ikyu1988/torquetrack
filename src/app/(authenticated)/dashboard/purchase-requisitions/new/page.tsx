@@ -22,14 +22,14 @@ import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
 import type { PurchaseRequisition, Part, PurchaseRequisitionItem, ShopSettings } from "@/types";
 import { useEffect, useState, useMemo } from "react";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Combobox, type ComboboxOption } from "@/components/ui/combobox"; // Updated import
 import { Separator } from "@/components/ui/separator";
 import { PURCHASE_REQUISITION_STATUSES } from "@/lib/constants";
 
 const requisitionItemSchema = z.object({
   id: z.string(),
-  partId: z.string().optional(), // Optional: if selecting an existing part
-  partName: z.string().optional(), // Can be auto-filled or manually entered if new
+  partId: z.string().optional(), 
+  partName: z.string().optional(), 
   description: z.string().min(1, "Item description is required.").max(255),
   quantity: z.coerce.number().int().min(1, "Quantity must be at least 1."),
   estimatedPricePerUnit: z.coerce.number().min(0).optional().or(z.literal('')),
@@ -37,7 +37,6 @@ const requisitionItemSchema = z.object({
 });
 
 const requisitionFormSchema = z.object({
-  // requestedByUserId: z.string().min(1, "Requester ID is required."), // Will be auto-filled conceptually
   department: z.string().max(100).optional().or(z.literal('')),
   status: z.nativeEnum(PURCHASE_REQUISITION_STATUSES).default(PURCHASE_REQUISITION_STATUSES.DRAFT),
   items: z.array(requisitionItemSchema).min(1, "At least one item is required."),
@@ -54,6 +53,14 @@ export default function NewPurchaseRequisitionPage() {
   const [isMounted, setIsMounted] = useState(false);
 
   const currency = useMemo(() => shopSettings?.currencySymbol || '₱', [shopSettings]);
+
+  const partOptions = useMemo((): ComboboxOption[] => {
+    return availableParts.map(part => ({
+      value: part.id,
+      label: `${part.name} (SKU: ${part.sku || 'N/A'})`,
+      ...part, // include all part details for easy access on select
+    }));
+  }, [availableParts]);
 
   const form = useForm<RequisitionFormValues>({
     resolver: zodResolver(requisitionFormSchema),
@@ -92,7 +99,7 @@ export default function NewPurchaseRequisitionPage() {
     if (typeof window !== 'undefined' && (window as any).__purchaseRequisitionStore) {
       const requisitionData: Omit<PurchaseRequisition, 'id' | 'createdAt' | 'updatedAt' | 'totalEstimatedValue' | 'submittedDate'> = {
         ...data,
-        requestedByUserId: "currentUserPlaceholder", // Replace with actual user ID
+        requestedByUserId: "currentUserPlaceholder", 
         items: data.items.map(item => ({
             ...item,
             estimatedPricePerUnit: item.estimatedPricePerUnit === '' ? undefined : Number(item.estimatedPricePerUnit),
@@ -172,26 +179,26 @@ export default function NewPurchaseRequisitionPage() {
                             render={({ field }) => (
                             <FormItem className="md:col-span-1">
                                 <FormLabel>Select Existing Part (Optional)</FormLabel>
-                                <Select 
-                                onValueChange={(value) => {
-                                    field.onChange(value);
-                                    const selectedPart = availableParts.find(p => p.id === value);
-                                    if (selectedPart) {
-                                        form.setValue(`items.${index}.partName`, selectedPart.name);
-                                        form.setValue(`items.${index}.description`, selectedPart.name + (selectedPart.brand ? ` (${selectedPart.brand})` : ''));
-                                        form.setValue(`items.${index}.estimatedPricePerUnit`, selectedPart.cost || selectedPart.price || 0);
+                                <Combobox
+                                  options={partOptions}
+                                  value={field.value}
+                                  onChange={(selectedValue, selectedOption) => {
+                                    field.onChange(selectedValue);
+                                    if (selectedOption) {
+                                      form.setValue(`items.${index}.partName`, selectedOption.name);
+                                      form.setValue(`items.${index}.description`, selectedOption.name + (selectedOption.brand ? ` (${selectedOption.brand})` : ''));
+                                      form.setValue(`items.${index}.estimatedPricePerUnit`, selectedOption.cost || selectedOption.price || 0);
+                                    } else {
+                                      form.setValue(`items.${index}.partName`, "");
+                                      // Optionally clear description and price if part is de-selected
+                                      // form.setValue(`items.${index}.description`, "");
+                                      // form.setValue(`items.${index}.estimatedPricePerUnit`, undefined);
                                     }
-                                }} 
-                                value={field.value}
-                                >
-                                <FormControl><SelectTrigger><SelectValue placeholder="Select existing part" /></SelectTrigger></FormControl>
-                                <SelectContent>
-                                    <SelectItem value="NONE_SELECTED_PART_VALUE">-- Enter Manually --</SelectItem>
-                                    {availableParts.map(part => (
-                                    <SelectItem key={part.id} value={part.id}>{part.name} (SKU: {part.sku || 'N/A'})</SelectItem>
-                                    ))}
-                                </SelectContent>
-                                </Select>
+                                  }}
+                                  placeholder="Search for a part..."
+                                  searchPlaceholder="Type to search parts..."
+                                  emptyPlaceholder="No part found."
+                                />
                                 <FormMessage />
                             </FormItem>
                             )}

@@ -23,24 +23,25 @@ import { useRouter, useSearchParams } from "next/navigation";
 import type { PurchaseOrder, PurchaseOrderItem, Supplier, ShopSettings, PurchaseRequisition, Part } from "@/types";
 import { useEffect, useState, useMemo, useCallback } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Combobox, type ComboboxOption } from "@/components/ui/combobox"; // Updated import
 import { Separator } from "@/components/ui/separator";
 import { DatePicker } from "@/components/ui/date-picker";
 import { PURCHASE_ORDER_STATUSES } from "@/lib/constants";
 
 const purchaseOrderItemSchema = z.object({
-  id: z.string(), // Corresponds to PurchaseRequisitionItem.id, if from a PR
-  partId: z.string().optional(), // Optional: if selecting an existing part
-  partName: z.string().optional(), // Can be auto-filled or manually entered if new
+  id: z.string(), 
+  partId: z.string().optional(), 
+  partName: z.string().optional(), 
   description: z.string().min(1, "Item description is required.").max(255),
   quantity: z.coerce.number().int().min(1, "Quantity must be at least 1."),
   unitPrice: z.coerce.number().min(0, "Unit price must be non-negative."),
-  totalPrice: z.coerce.number().min(0), // Calculated, but kept in form for easy access
+  totalPrice: z.coerce.number().min(0), 
 });
 
 const purchaseOrderFormSchema = z.object({
   purchaseRequisitionId: z.string().optional(),
   supplierId: z.string().min(1, "A supplier must be selected."),
-  supplierName: z.string(), // Auto-filled
+  supplierName: z.string(), 
   orderDate: z.date(),
   expectedDeliveryDate: z.date().optional(),
   items: z.array(purchaseOrderItemSchema).min(1, "At least one item is required."),
@@ -63,8 +64,6 @@ const purchaseOrderFormSchema = z.object({
 
 type PurchaseOrderFormValues = z.infer<typeof purchaseOrderFormSchema>;
 
-const NO_PART_SELECTED_VALUE = "__NO_PART_SELECTED__";
-
 export default function NewPurchaseOrderPage() {
   const { toast } = useToast();
   const router = useRouter();
@@ -75,6 +74,14 @@ export default function NewPurchaseOrderPage() {
   const [isMounted, setIsMounted] = useState(false);
 
   const currency = useMemo(() => shopSettings?.currencySymbol || '₱', [shopSettings]);
+
+  const partOptions = useMemo((): ComboboxOption[] => {
+    return availableParts.map(part => ({
+      value: part.id,
+      label: `${part.name} (SKU: ${part.sku || 'N/A'}, Cost: ${currency}${part.cost?.toFixed(2) || part.price.toFixed(2)})`,
+      ...part, 
+    }));
+  }, [availableParts, currency]);
 
   const form = useForm<PurchaseOrderFormValues>({
     resolver: zodResolver(purchaseOrderFormSchema),
@@ -112,7 +119,7 @@ export default function NewPurchaseOrderPage() {
           const totalPrice = prItem.quantity * unitPrice;
           return {
             id: prItem.id,
-            partId: prItem.partId || NO_PART_SELECTED_VALUE,
+            partId: prItem.partId || undefined,
             partName: prItem.partName || selectedPart?.name || "New Item",
             description: prItem.description || selectedPart?.name || "New Item Description",
             quantity: prItem.quantity,
@@ -170,7 +177,7 @@ export default function NewPurchaseOrderPage() {
         ...data,
         items: data.items.map(item => ({
           ...item,
-          partId: item.partId === NO_PART_SELECTED_VALUE ? "" : item.partId || "", // Ensure partId is string or empty
+          partId: item.partId || "", 
           totalPrice: item.quantity * item.unitPrice,
         })),
         taxAmount: data.taxAmount === '' ? undefined : Number(data.taxAmount),
@@ -296,7 +303,7 @@ export default function NewPurchaseOrderPage() {
               <div className="space-y-4">
                 <div className="flex justify-between items-center">
                   <h3 className="text-lg font-medium">Order Items</h3>
-                  <Button type="button" variant="outline" size="sm" onClick={() => appendItem({ id: Date.now().toString(), partId: NO_PART_SELECTED_VALUE, partName: "", description: "", quantity: 1, unitPrice: 0, totalPrice: 0 })}>
+                  <Button type="button" variant="outline" size="sm" onClick={() => appendItem({ id: Date.now().toString(), partId: undefined, partName: "", description: "", quantity: 1, unitPrice: 0, totalPrice: 0 })}>
                     <PlusCircle className="mr-2 h-4 w-4" /> Add Item
                   </Button>
                 </div>
@@ -308,32 +315,26 @@ export default function NewPurchaseOrderPage() {
                             name={`items.${index}.partId`}
                             render={({ field }) => (
                             <FormItem className="md:col-span-1">
-                                <FormLabel>Select Existing Part (Optional)</FormLabel>
-                                <Select 
-                                onValueChange={(value) => {
-                                    field.onChange(value);
-                                    const selectedPart = availableParts.find(p => p.id === value);
-                                    if (selectedPart) {
-                                        form.setValue(`items.${index}.partName`, selectedPart.name);
-                                        form.setValue(`items.${index}.description`, selectedPart.name + (selectedPart.brand ? ` (${selectedPart.brand})` : ''));
-                                        form.setValue(`items.${index}.unitPrice`, selectedPart.cost || selectedPart.price || 0);
-                                        const qty = form.getValues(`items.${index}.quantity`) || 1;
-                                        form.setValue(`items.${index}.totalPrice`, qty * (selectedPart.cost || selectedPart.price || 0));
-                                    } else if (value === NO_PART_SELECTED_VALUE) {
-                                        form.setValue(`items.${index}.partName`, "");
-                                        // Keep description and unitPrice as they are for manual entry
+                                <FormLabel>Select Part (Optional)</FormLabel>
+                                <Combobox
+                                  options={partOptions}
+                                  value={field.value}
+                                  onChange={(selectedValue, selectedOption) => {
+                                    field.onChange(selectedValue);
+                                    if (selectedOption) {
+                                      form.setValue(`items.${index}.partName`, selectedOption.name);
+                                      form.setValue(`items.${index}.description`, selectedOption.label);
+                                      form.setValue(`items.${index}.unitPrice`, selectedOption.cost || selectedOption.price || 0);
+                                      const qty = form.getValues(`items.${index}.quantity`) || 1;
+                                      form.setValue(`items.${index}.totalPrice`, qty * (selectedOption.cost || selectedOption.price || 0));
+                                    } else {
+                                       form.setValue(`items.${index}.partName`, "");
                                     }
-                                }} 
-                                value={field.value || NO_PART_SELECTED_VALUE}
-                                >
-                                <FormControl><SelectTrigger><SelectValue placeholder="Select existing part or enter manually" /></SelectTrigger></FormControl>
-                                <SelectContent>
-                                    <SelectItem value={NO_PART_SELECTED_VALUE}>-- Enter Manually --</SelectItem>
-                                    {availableParts.map(part => (
-                                    <SelectItem key={part.id} value={part.id}>{part.name} (SKU: {part.sku || 'N/A'})</SelectItem>
-                                    ))}
-                                </SelectContent>
-                                </Select>
+                                  }}
+                                  placeholder="Search for a part..."
+                                  searchPlaceholder="Type to search parts..."
+                                  emptyPlaceholder="No part found."
+                                />
                                 <FormMessage />
                             </FormItem>
                             )}
@@ -557,6 +558,3 @@ export default function NewPurchaseOrderPage() {
     </div>
   );
 }
-
-
-    
