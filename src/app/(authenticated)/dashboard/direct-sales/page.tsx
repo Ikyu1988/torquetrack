@@ -44,6 +44,8 @@ const directSaleFormSchema = z.object({
 
 type DirectSaleFormValues = z.infer<typeof directSaleFormSchema>;
 
+const WALK_IN_CUSTOMER_IDENTIFIER = "__walk_in_special_value__";
+
 // Adjusted type for adding a job order, taxAmount is now handled by the store logic mostly
 type AddJobOrderInput = Omit<JobOrder, 'id' | 'createdAt' | 'updatedAt' | 'createdByUserId' | 'grandTotal' | 'amountPaid' | 'paymentHistory' | 'taxAmount'> & {
   initialPaymentMethod?: PaymentMethod;
@@ -65,7 +67,7 @@ export default function DirectSalesPage() {
   const form = useForm<DirectSaleFormValues>({
     resolver: zodResolver(directSaleFormSchema),
     defaultValues: {
-      customerId: "",
+      customerId: undefined, // Default to undefined to show placeholder
       partsUsed: [],
       discountAmount: undefined,
       paymentMethod: "Cash",
@@ -111,7 +113,7 @@ export default function DirectSalesPage() {
     if (typeof window !== 'undefined' && (window as any).__jobOrderStore) {
         // Tax will be calculated by the __jobOrderStore.addJobOrder function
         const saleOrderData: AddJobOrderInput = {
-            customerId: data.customerId || undefined,
+            customerId: data.customerId === WALK_IN_CUSTOMER_IDENTIFIER ? undefined : data.customerId,
             motorcycleId: undefined, 
             status: JOB_ORDER_STATUSES.SALE_COMPLETED,
             servicesPerformed: [], 
@@ -131,7 +133,7 @@ export default function DirectSalesPage() {
           title: "Sale Completed",
           description: `Direct sale #${newSaleOrder.id.substring(0,6)} processed successfully. Grand Total: ${currency}${newSaleOrder.grandTotal.toFixed(2)}`,
         });
-        form.reset({ customerId: "", partsUsed: [], discountAmount: undefined, paymentMethod: "Cash", paymentNotes: "" });
+        form.reset({ customerId: undefined, partsUsed: [], discountAmount: undefined, paymentMethod: "Cash", paymentNotes: "" });
         if ((window as any).__inventoryStore) {
              setAvailableParts((window as any).__inventoryStore.parts.filter((p: Part) => p.isActive && p.stockQuantity > 0));
         }
@@ -168,14 +170,17 @@ export default function DirectSalesPage() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Customer (Optional)</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value || ""}>
+                    <Select 
+                      onValueChange={field.onChange} 
+                      value={field.value} // field.value can be undefined
+                    >
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Select a customer or leave for Walk-in" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="">Walk-in Customer</SelectItem>
+                        <SelectItem value={WALK_IN_CUSTOMER_IDENTIFIER}>Walk-in Customer</SelectItem>
                         {customers.map(customer => (
                           <SelectItem key={customer.id} value={customer.id}>
                             {customer.firstName} {customer.lastName} ({customer.phone})
