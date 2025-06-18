@@ -3,7 +3,7 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { FileText, Package, Users, Wrench, ArrowRight, ClipboardList, AlertTriangle, DollarSign } from "lucide-react";
+import { FileText, Package, Users, Wrench, ArrowRight, ClipboardList, AlertTriangle, DollarSign, ShoppingCart } from "lucide-react"; // Added ShoppingCart
 import Link from "next/link";
 import Image from "next/image";
 import React, { useEffect, useState, useMemo } from "react";
@@ -189,3 +189,4 @@ export default function DashboardPage() {
     </div>
   );
 }
+
