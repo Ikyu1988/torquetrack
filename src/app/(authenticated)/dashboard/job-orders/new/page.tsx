@@ -103,22 +103,22 @@ export default function NewJobOrderPage() {
   });
 
   const selectedCustomerId = form.watch("customerId");
-  const servicesPerformed = form.watch("servicesPerformed");
-  const partsUsed = form.watch("partsUsed");
-  const discountAmount = form.watch("discountAmount") || 0;
+  const servicesPerformedWatch = form.watch("servicesPerformed");
+  const partsUsedWatch = form.watch("partsUsed");
+  const discountAmountWatch = form.watch("discountAmount") || 0;
 
   const totalLaborCost = useMemo(() => {
-    return servicesPerformed.reduce((sum, item) => sum + (Number(item.laborCost) || 0), 0);
-  }, [servicesPerformed]);
+    return servicesPerformedWatch.reduce((sum, item) => sum + (Number(item.laborCost) || 0), 0);
+  }, [servicesPerformedWatch]);
 
   const totalPartsCost = useMemo(() => {
-    return partsUsed.reduce((sum, item) => sum + (Number(item.totalPrice) || 0), 0);
-  }, [partsUsed]);
+    return partsUsedWatch.reduce((sum, item) => sum + (Number(item.totalPrice) || 0), 0);
+  }, [partsUsedWatch]);
   
   const grandTotal = useMemo(() => {
-    const discount = Number(discountAmount) || 0;
+    const discount = Number(discountAmountWatch) || 0;
     return totalLaborCost + totalPartsCost - discount;
-  }, [totalLaborCost, totalPartsCost, discountAmount]);
+  }, [totalLaborCost, totalPartsCost, discountAmountWatch]);
 
 
   useEffect(() => {
@@ -153,7 +153,6 @@ export default function NewJobOrderPage() {
         const jobOrderData: Omit<JobOrder, 'id' | 'createdAt' | 'updatedAt' | 'createdByUserId' | 'grandTotal'> & { grandTotal?: number } = {
             ...data,
             discountAmount: data.discountAmount === '' ? undefined : Number(data.discountAmount),
-            // grandTotal will be calculated in the store
         };
       newJobOrder = (window as any).__jobOrderStore.addJobOrder(jobOrderData);
     }
@@ -206,7 +205,7 @@ export default function NewJobOrderPage() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Customer</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value}>
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="Select a customer" />
@@ -258,7 +257,7 @@ export default function NewJobOrderPage() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Job Order Status</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value}>
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Select status" />
@@ -293,7 +292,7 @@ export default function NewJobOrderPage() {
               <div className="space-y-4">
                 <div className="flex justify-between items-center">
                   <h3 className="text-lg font-medium">Services Performed</h3>
-                  <Button type="button" variant="outline" size="sm" onClick={() => appendService({ id: Date.now().toString(), serviceId: "", serviceName: "", laborCost: 0 })}>
+                  <Button type="button" variant="outline" size="sm" onClick={() => appendService({ id: Date.now().toString(), serviceId: "", serviceName: "", laborCost: 0, notes: "", assignedMechanicId: "" })}>
                     <PlusCircle className="mr-2 h-4 w-4" /> Add Service
                   </Button>
                 </div>
@@ -313,7 +312,7 @@ export default function NewJobOrderPage() {
                                 form.setValue(`servicesPerformed.${index}.serviceName`, selectedService?.name || "");
                                 form.setValue(`servicesPerformed.${index}.laborCost`, selectedService?.defaultLaborCost || 0);
                               }} 
-                              defaultValue={field.value}
+                              value={field.value}
                             >
                               <FormControl><SelectTrigger><SelectValue placeholder="Select a service" /></SelectTrigger></FormControl>
                               <SelectContent>
@@ -349,7 +348,7 @@ export default function NewJobOrderPage() {
                         render={({ field }) => (
                           <FormItem>
                             <FormLabel>Assigned Mechanic (Optional)</FormLabel>
-                            <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <Select onValueChange={field.onChange} value={field.value || ""} >
                               <FormControl><SelectTrigger><SelectValue placeholder="Select mechanic" /></SelectTrigger></FormControl>
                               <SelectContent>
                                 <SelectItem value="">None</SelectItem>
@@ -422,7 +421,7 @@ export default function NewJobOrderPage() {
                                 const qty = form.getValues(`partsUsed.${index}.quantity`) || 1;
                                 form.setValue(`partsUsed.${index}.totalPrice`, (selectedPart?.price || 0) * qty);
                               }} 
-                              defaultValue={field.value}
+                              value={field.value}
                             >
                               <FormControl><SelectTrigger><SelectValue placeholder="Select a part" /></SelectTrigger></FormControl>
                               <SelectContent>
@@ -558,7 +557,7 @@ export default function NewJobOrderPage() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Payment Status</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value}>
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="Select payment status" />
@@ -591,3 +590,6 @@ export default function NewJobOrderPage() {
     </div>
   );
 }
+
+
+    
