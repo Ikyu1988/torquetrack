@@ -64,6 +64,8 @@ const jobOrderFormSchema = z.object({
 
 type JobOrderFormValues = z.infer<typeof jobOrderFormSchema>;
 
+const NO_MECHANIC_DISPLAY_VALUE = "__SELECT_NO_MECHANIC__";
+
 export default function NewJobOrderPage() {
   const { toast } = useToast();
   const router = useRouter();
@@ -292,7 +294,7 @@ export default function NewJobOrderPage() {
               <div className="space-y-4">
                 <div className="flex justify-between items-center">
                   <h3 className="text-lg font-medium">Services Performed</h3>
-                  <Button type="button" variant="outline" size="sm" onClick={() => appendService({ id: Date.now().toString(), serviceId: "", serviceName: "", laborCost: 0, notes: "", assignedMechanicId: "" })}>
+                  <Button type="button" variant="outline" size="sm" onClick={() => appendService({ id: Date.now().toString(), serviceId: "", serviceName: "", laborCost: 0, notes: "", assignedMechanicId: undefined })}>
                     <PlusCircle className="mr-2 h-4 w-4" /> Add Service
                   </Button>
                 </div>
@@ -345,13 +347,18 @@ export default function NewJobOrderPage() {
                      <FormField
                         control={form.control}
                         name={`servicesPerformed.${index}.assignedMechanicId`}
-                        render={({ field }) => (
+                        render={({ field }) => ( // field.value is string (mechanicId) or undefined
                           <FormItem>
                             <FormLabel>Assigned Mechanic (Optional)</FormLabel>
-                            <Select onValueChange={field.onChange} value={field.value || ""} >
+                            <Select 
+                              onValueChange={(selectedValueFromSelector) => {
+                                field.onChange(selectedValueFromSelector === NO_MECHANIC_DISPLAY_VALUE ? undefined : selectedValueFromSelector);
+                              }} 
+                              value={field.value} // if undefined, placeholder will show
+                            >
                               <FormControl><SelectTrigger><SelectValue placeholder="Select mechanic" /></SelectTrigger></FormControl>
                               <SelectContent>
-                                <SelectItem value="">None</SelectItem>
+                                <SelectItem value={NO_MECHANIC_DISPLAY_VALUE}>None</SelectItem>
                                 {availableMechanics.map(mech => (
                                   <SelectItem key={mech.id} value={mech.id}>{mech.name}</SelectItem>
                                 ))}
