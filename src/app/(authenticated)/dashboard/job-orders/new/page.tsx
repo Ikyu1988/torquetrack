@@ -347,19 +347,21 @@ export default function NewJobOrderPage() {
                      <FormField
                         control={form.control}
                         name={`servicesPerformed.${index}.assignedMechanicId`}
-                        render={({ field }) => ( // field.value is string (mechanicId) or undefined
+                        render={({ field }) => ( 
                           <FormItem>
                             <FormLabel>Assigned Mechanic (Optional)</FormLabel>
                             <Select 
                               onValueChange={(selectedValueFromSelector) => {
                                 field.onChange(selectedValueFromSelector === NO_MECHANIC_DISPLAY_VALUE ? undefined : selectedValueFromSelector);
                               }} 
-                              value={field.value} // if undefined, placeholder will show
+                              value={field.value} 
                             >
                               <FormControl><SelectTrigger><SelectValue placeholder="Select mechanic" /></SelectTrigger></FormControl>
                               <SelectContent>
                                 <SelectItem value={NO_MECHANIC_DISPLAY_VALUE}>None</SelectItem>
-                                {availableMechanics.map(mech => (
+                                {availableMechanics
+                                  .filter(mech => mech.id && mech.id.trim() !== "") 
+                                  .map(mech => (
                                   <SelectItem key={mech.id} value={mech.id}>{mech.name}</SelectItem>
                                 ))}
                               </SelectContent>
