@@ -1,10 +1,10 @@
 
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { PlusCircle, Package, Pencil, Trash2 } from "lucide-react";
+import { PlusCircle, Package, Pencil, Trash2, Download, Upload } from "lucide-react";
 import Link from "next/link";
 import {
   Table,
@@ -43,6 +43,7 @@ const initialParts: Part[] = [
     isActive: true,
     createdAt: new Date(),
     updatedAt: new Date(),
+    notes: "Standard spark plug"
   },
   {
     id: "part2",
@@ -73,6 +74,7 @@ const initialParts: Part[] = [
     isActive: false,
     createdAt: new Date(),
     updatedAt: new Date(),
+    notes: "Sintered brake pads"
   },
 ];
 
@@ -83,7 +85,7 @@ if (typeof window !== 'undefined') {
       addPart: (part: Omit<Part, 'id' | 'createdAt' | 'updatedAt'>) => {
         const newPart: Part = {
           ...part,
-          id: String(Date.now()),
+          id: String(Date.now() + Math.random()), // Ensure more unique ID
           createdAt: new Date(),
           updatedAt: new Date(),
         };
@@ -115,6 +117,7 @@ export default function InventoryPage() {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [partToDelete, setPartToDelete] = useState<Part | null>(null);
   const [isMounted, setIsMounted] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setIsMounted(true);
@@ -162,6 +165,175 @@ export default function InventoryPage() {
     setShowDeleteDialog(false);
     setPartToDelete(null);
   };
+
+  const handleExportCSV = () => {
+    if (parts.length === 0) {
+      toast({ title: "No Data", description: "There are no parts to export.", variant: "destructive" });
+      return;
+    }
+    const headers = [
+      "id", "name", "brand", "category", "sku", "price", "cost", 
+      "supplier", "stockQuantity", "minStockAlert", "notes", "isActive", 
+      "createdAt", "updatedAt"
+    ];
+    const csvRows = [
+      headers.join(','),
+      ...parts.map(part => headers.map(header => {
+        let value = part[header as keyof Part];
+        if (value instanceof Date) {
+          value = value.toISOString();
+        } else if (typeof value === 'string' && value.includes(',')) {
+          value = `"${value}"`; // Enclose in quotes if it contains a comma
+        } else if (value === undefined || value === null) {
+          value = "";
+        }
+        return value;
+      }).join(','))
+    ];
+    const csvString = csvRows.join('\n');
+    const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute("download", "inventory_export.csv");
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    toast({ title: "Export Successful", description: "Inventory data exported to CSV." });
+  };
+
+  const handleImportCSV = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const text = e.target?.result as string;
+      if (!text) {
+        toast({ title: "Import Error", description: "Could not read file content.", variant: "destructive" });
+        return;
+      }
+      const lines = text.split(/\r\n|\n/);
+      if (lines.length < 2) {
+        toast({ title: "Import Error", description: "CSV file must have a header row and at least one data row.", variant: "destructive" });
+        return;
+      }
+
+      // Define expected headers and their mapping to Part keys
+      const headerLine = lines[0].split(',').map(h => h.trim().toLowerCase());
+      const expectedPartHeaders: Record<string, { key: keyof Omit<Part, 'id' | 'createdAt' | 'updatedAt'>, type: 'string' | 'number' | 'integer' | 'boolean', optional?: boolean }> = {
+        'name': { key: 'name', type: 'string' },
+        'brand': { key: 'brand', type: 'string', optional: true },
+        'category': { key: 'category', type: 'string', optional: true },
+        'sku': { key: 'sku', type: 'string', optional: true },
+        'price': { key: 'price', type: 'number' },
+        'cost': { key: 'cost', type: 'number', optional: true },
+        'supplier': { key: 'supplier', type: 'string', optional: true },
+        'stockquantity': { key: 'stockQuantity', type: 'integer' },
+        'minstockalert': { key: 'minStockAlert', type: 'integer', optional: true },
+        'notes': { key: 'notes', type: 'string', optional: true },
+        'isactive': { key: 'isActive', type: 'boolean' },
+      };
+      
+      // Create a map of CSV header index to Part key and type
+      const headerMap: { index: number, targetKey: keyof Omit<Part, 'id' | 'createdAt' | 'updatedAt'>, type: 'string' | 'number' | 'integer' | 'boolean', optional?: boolean }[] = [];
+      headerLine.forEach((header, index) => {
+        const mapping = expectedPartHeaders[header];
+        if (mapping) {
+          headerMap.push({ index, targetKey: mapping.key, type: mapping.type, optional: mapping.optional });
+        }
+      });
+
+      if (!headerMap.find(h => h.targetKey === 'name') || !headerMap.find(h => h.targetKey === 'price') || !headerMap.find(h => h.targetKey === 'stockQuantity') || !headerMap.find(h => h.targetKey === 'isActive') ) {
+         toast({ title: "Import Error", description: "CSV must contain at least 'name', 'price', 'stockQuantity', and 'isActive' headers.", variant: "destructive" });
+        return;
+      }
+
+      let importedCount = 0;
+      let errorCount = 0;
+
+      for (let i = 1; i < lines.length; i++) {
+        const line = lines[i];
+        if (!line.trim()) continue; // Skip empty lines
+
+        const values = line.split(','); // Simple split, might need more robust parsing for quoted fields
+        
+        const partData: Partial<Omit<Part, 'id' | 'createdAt' | 'updatedAt'>> = {};
+        let rowIsValid = true;
+
+        headerMap.forEach(mapping => {
+            const valueStr = values[mapping.index]?.trim();
+            if (valueStr === undefined || valueStr === "") {
+                if (!mapping.optional) {
+                     // console.warn(`Missing non-optional value for ${mapping.targetKey} in row ${i+1}`);
+                    // rowIsValid = false; // Allow optional if not explicitly required
+                }
+                partData[mapping.targetKey] = undefined;
+                return;
+            }
+
+            try {
+                switch (mapping.type) {
+                    case 'string':
+                        partData[mapping.targetKey] = valueStr.startsWith('"') && valueStr.endsWith('"') ? valueStr.slice(1, -1) : valueStr;
+                        break;
+                    case 'number':
+                        const numVal = parseFloat(valueStr);
+                        if (isNaN(numVal)) throw new Error(`Invalid number for ${mapping.targetKey}`);
+                        (partData as any)[mapping.targetKey] = numVal;
+                        break;
+                    case 'integer':
+                        const intVal = parseInt(valueStr, 10);
+                        if (isNaN(intVal)) throw new Error(`Invalid integer for ${mapping.targetKey}`);
+                        (partData as any)[mapping.targetKey] = intVal;
+                        break;
+                    case 'boolean':
+                        const lowerVal = valueStr.toLowerCase();
+                        if (lowerVal === 'true' || lowerVal === '1') {
+                            partData[mapping.targetKey] = true;
+                        } else if (lowerVal === 'false' || lowerVal === '0') {
+                            partData[mapping.targetKey] = false;
+                        } else {
+                             throw new Error(`Invalid boolean for ${mapping.targetKey}`);
+                        }
+                        break;
+                }
+            } catch (err: any) {
+                // console.error(`Error parsing row ${i+1}, column ${mapping.targetKey}: ${err.message}`);
+                rowIsValid = false;
+            }
+        });
+
+        // Ensure required fields after potential undefined settings from loop
+        if (partData.name === undefined || partData.price === undefined || partData.stockQuantity === undefined || partData.isActive === undefined) {
+            rowIsValid = false;
+        }
+
+
+        if (rowIsValid && (window as any).__inventoryStore) {
+          (window as any).__inventoryStore.addPart(partData as Omit<Part, 'id' | 'createdAt' | 'updatedAt'>);
+          importedCount++;
+        } else {
+          errorCount++;
+        }
+      }
+
+      refreshParts();
+      toast({
+        title: "Import Complete",
+        description: `${importedCount} parts imported successfully. ${errorCount > 0 ? `${errorCount} rows had errors and were skipped.` : ''}`,
+      });
+    };
+    reader.onerror = () => {
+      toast({ title: "Import Error", description: "Failed to read the file.", variant: "destructive" });
+    };
+    reader.readAsText(file);
+    if(fileInputRef.current) {
+        fileInputRef.current.value = ""; // Reset file input
+    }
+  };
   
   if (!isMounted) {
     return <div className="flex justify-center items-center h-screen"><p>Loading inventory...</p></div>; 
@@ -170,7 +342,7 @@ export default function InventoryPage() {
   return (
     <div className="flex flex-col gap-6">
       <Card className="shadow-lg">
-        <CardHeader className="flex flex-row items-center justify-between">
+        <CardHeader className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-3">
               <Package className="h-6 w-6 text-primary" />
@@ -178,11 +350,26 @@ export default function InventoryPage() {
             </div>
             <CardDescription>Manage parts, stock levels, and suppliers.</CardDescription>
           </div>
-           <Button asChild>
-            <Link href="/dashboard/inventory/new">
-              <PlusCircle className="mr-2 h-4 w-4" /> Add New Part
-            </Link>
-          </Button>
+          <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
+            <Button onClick={() => fileInputRef.current?.click()} variant="outline" className="w-full sm:w-auto">
+              <Upload className="mr-2 h-4 w-4" /> Import CSV
+            </Button>
+            <input 
+                type="file" 
+                ref={fileInputRef} 
+                onChange={handleImportCSV} 
+                accept=".csv" 
+                className="hidden" 
+            />
+            <Button onClick={handleExportCSV} variant="outline" className="w-full sm:w-auto">
+              <Download className="mr-2 h-4 w-4" /> Export CSV
+            </Button>
+            <Button asChild className="w-full sm:w-auto">
+              <Link href="/dashboard/inventory/new">
+                <PlusCircle className="mr-2 h-4 w-4" /> Add New Part
+              </Link>
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           {parts.length > 0 ? (
@@ -238,7 +425,7 @@ export default function InventoryPage() {
             <div className="flex flex-col items-center justify-center gap-4 py-10 text-muted-foreground">
                 <Package className="h-16 w-16" />
                 <p className="text-lg">No parts found in inventory.</p>
-                <p>Get started by adding a new part.</p>
+                <p>Get started by adding a new part or importing from CSV.</p>
             </div>
           )}
         </CardContent>
@@ -263,3 +450,5 @@ export default function InventoryPage() {
     </div>
   );
 }
+
+    
