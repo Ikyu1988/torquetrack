@@ -1,9 +1,12 @@
+// src/app/layout.tsx
+"use client"; // AuthProvider requires this to be a client component
 
-import type { Metadata } from 'next';
+import type { Metadata } from 'next'; // Still keep for static metadata if possible
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
 import { Inter as FontSans, Space_Grotesk as FontHeadline } from 'next/font/google';
 import { cn } from "@/lib/utils";
+import { AuthProvider } from "@/contexts/AuthContext"; // Import AuthProvider
 
 const fontSans = FontSans({
   subsets: ["latin"],
@@ -16,10 +19,11 @@ const fontHeadline = FontHeadline({
   weight: ['300', '400', '500', '700'],
 })
 
-export const metadata: Metadata = {
-  title: 'TorqueTrack - Motorcycle Shop Management',
-  description: 'Efficiently manage your motorcycle shop with TorqueTrack.',
-};
+// Metadata can still be defined but might not be fully static if layout is client component
+// export const metadata: Metadata = { // This might have limitations now
+//   title: 'TorqueTrack - Motorcycle Shop Management',
+//   description: 'Efficiently manage your motorcycle shop with TorqueTrack.',
+// };
 
 // Script to apply theme from localStorage before hydration
 const ApplyThemeScript = () => (
@@ -57,6 +61,9 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <head>
         <ApplyThemeScript />
+        {/* If metadata object above doesn't work, you might need to set title in <head> directly */}
+        <title>TorqueTrack - Motorcycle Shop Management</title>
+        <meta name="description" content="Efficiently manage your motorcycle shop with TorqueTrack." />
       </head>
       <body 
         className={cn(
@@ -65,7 +72,9 @@ export default function RootLayout({
           fontHeadline.variable
         )}
       >
-        {children}
+        <AuthProvider> {/* Wrap children with AuthProvider */}
+          {children}
+        </AuthProvider>
         <Toaster />
       </body>
     </html>

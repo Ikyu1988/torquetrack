@@ -1,3 +1,4 @@
+// src/components/navigation/UserNav.tsx
 "use client";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -11,44 +12,48 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { LogOut, Settings, User } from "lucide-react";
+import { LogOut, Settings, User as UserIcon, Loader2 } from "lucide-react"; // Added Loader2
 import Link from "next/link";
-
-// TODO: Replace with actual user data and authentication logic
-const user = {
-  name: "Admin User",
-  email: "admin@torquetrack.com",
-  avatar: "https://placehold.co/100x100.png", 
-  initials: "AU", 
-};
+import { useAuth } from "@/contexts/AuthContext";
 
 export function UserNav() {
-  // const { user, logout } = useAuth(); // Placeholder for auth context
+  const { user, loading, signOut } = useAuth();
 
-  const handleLogout = () => {
-    // logout();
-    // router.push('/login');
-    if (typeof window !== 'undefined') {
-      window.location.href = '/login'; // Simple redirect for now
-    }
+  const handleLogout = async () => {
+    await signOut();
+    // Navigation is handled by the signOut function in AuthContext
   };
+
+  if (loading) {
+    return (
+      <Button variant="ghost" className="relative h-10 w-10 rounded-full" disabled>
+        <Loader2 className="h-5 w-5 animate-spin" />
+      </Button>
+    );
+  }
+
+  const userDisplayName = user?.displayName || user?.email?.split('@')[0] || "User";
+  const userEmail = user?.email || "No email";
+  const userInitials = user?.displayName?.substring(0, 2).toUpperCase() || 
+                       user?.email?.substring(0, 2).toUpperCase() || 
+                       "U";
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" className="relative h-10 w-10 rounded-full">
           <Avatar className="h-10 w-10">
-            <AvatarImage src={user.avatar} alt={user.name} data-ai-hint="person avatar" />
-            <AvatarFallback>{user.initials}</AvatarFallback>
+            <AvatarImage src={user?.photoURL || `https://placehold.co/100x100.png?text=${userInitials}`} alt={userDisplayName} data-ai-hint="person avatar" />
+            <AvatarFallback>{userInitials}</AvatarFallback>
           </Avatar>
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent className="w-56" align="end" forceMount>
         <DropdownMenuLabel className="font-normal">
           <div className="flex flex-col space-y-1">
-            <p className="text-sm font-medium leading-none">{user.name}</p>
+            <p className="text-sm font-medium leading-none">{userDisplayName}</p>
             <p className="text-xs leading-none text-muted-foreground">
-              {user.email}
+              {userEmail}
             </p>
           </div>
         </DropdownMenuLabel>
@@ -56,7 +61,7 @@ export function UserNav() {
         <DropdownMenuGroup>
           <DropdownMenuItem asChild>
             <Link href="/dashboard/profile">
-              <User className="mr-2 h-4 w-4" />
+              <UserIcon className="mr-2 h-4 w-4" />
               <span>Profile</span>
             </Link>
           </DropdownMenuItem>

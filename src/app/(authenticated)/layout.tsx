@@ -1,9 +1,13 @@
-"use client"; // Required for state and effects
+// src/app/(authenticated)/layout.tsx
+"use client"; 
 
 import React, { useState, useEffect } from "react";
 import { AppHeader } from "@/components/layout/AppHeader";
 import { SidebarNav } from "@/components/navigation/SidebarNav";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/contexts/AuthContext";
+import { useRouter } from "next/navigation";
+import { Skeleton } from "@/components/ui/skeleton"; // For loading state
 
 export default function AuthenticatedLayout({
   children,
@@ -12,6 +16,8 @@ export default function AuthenticatedLayout({
 }) {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
+  const { user, loading } = useAuth();
+  const router = useRouter();
 
   useEffect(() => {
     setIsMounted(true);
@@ -20,6 +26,12 @@ export default function AuthenticatedLayout({
       setIsSidebarCollapsed(JSON.parse(storedSidebarState));
     }
   }, []);
+
+  useEffect(() => {
+    if (isMounted && !loading && !user) {
+      router.push("/login");
+    }
+  }, [user, loading, router, isMounted]);
 
   const toggleSidebar = () => {
     setIsSidebarCollapsed(prev => {
@@ -31,9 +43,17 @@ export default function AuthenticatedLayout({
     });
   };
 
-  if (!isMounted) {
-    // To prevent hydration mismatch, render null or a loading skeleton until client-side mount
-    return null; 
+  if (!isMounted || loading || !user) {
+    // Show a full-page loading skeleton or spinner
+    return (
+      <div className="flex min-h-screen w-full items-center justify-center bg-background">
+        <div className="flex flex-col items-center gap-4">
+          <Skeleton className="h-12 w-12 rounded-full bg-muted" />
+          <Skeleton className="h-4 w-[200px] bg-muted" />
+          <Skeleton className="h-4 w-[150px] bg-muted" />
+        </div>
+      </div>
+    );
   }
 
   return (
