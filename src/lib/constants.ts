@@ -16,6 +16,7 @@ export const JOB_ORDER_STATUSES = {
   READY_FOR_PICKUP: 'Ready for Pickup',
   COMPLETED: 'Completed',
   CANCELLED: 'Cancelled',
+  SALE_COMPLETED: 'Sale - Completed', // New status for direct sales
 } as const;
 
 export type JobOrderStatus = typeof JOB_ORDER_STATUSES[keyof typeof JOB_ORDER_STATUSES];

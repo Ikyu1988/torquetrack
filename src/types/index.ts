@@ -24,7 +24,7 @@ export interface Customer {
 
 export interface Motorcycle {
   id: string;
-  customerId: string;
+  customerId: string; // A motorcycle must belong to a customer
   make: string;
   model: string;
   year?: number;
@@ -88,7 +88,7 @@ export interface JobOrderPartItem {
 
 export interface Payment {
   id: string;
-  jobOrderId: string;
+  jobOrderId: string; // Links payment to a JobOrder or a Direct Sale (which might be stored as a JobOrder)
   amount: number;
   paymentDate: Date;
   method: PaymentMethod;
@@ -99,27 +99,27 @@ export interface Payment {
 
 export interface JobOrder {
   id: string;
-  customerId: string;
-  motorcycleId: string;
+  customerId?: string; // Optional for direct/walk-in sales
+  motorcycleId?: string; // Optional for direct/walk-in sales
   status: JobOrderStatus;
   
   servicesPerformed: JobOrderServiceItem[]; 
   partsUsed: JobOrderPartItem[];          
 
-  servicesDescription?: string; 
-  partsDescription?: string;    
+  servicesDescription?: string; // Overall notes for services, can be empty if using line items
+  partsDescription?: string;    // Overall notes for parts, can be empty if using line items
 
-  diagnostics?: string;
+  diagnostics?: string; // Relevant for service jobs
   images?: string[]; 
-  estimatedCompletionDate?: Date;
+  estimatedCompletionDate?: Date; // Relevant for service jobs
   actualCompletionDate?: Date;
   
   discountAmount?: number;
-  taxAmount?: number; 
+  taxAmount?: number; // This could be calculated based on shop settings
   grandTotal: number;
   
   paymentStatus: PaymentStatus;
-  amountPaid: number; // Total amount paid for this job order
+  amountPaid: number; // Total amount paid for this job order/sale
   paymentHistory: Payment[]; // Array of payment transactions
 
   createdAt: Date;
@@ -136,8 +136,6 @@ export interface Mechanic {
   updatedAt: Date;
 }
 
-// Payment interface was moved up
-
 export interface ShopSettings {
   shopName: string;
   shopAddress?: string;
@@ -147,4 +145,3 @@ export interface ShopSettings {
   defaultTaxRate?: number; // as a percentage, e.g., 10 for 10%
   updatedAt?: Date;
 }
-

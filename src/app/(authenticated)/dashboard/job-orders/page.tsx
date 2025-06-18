@@ -28,7 +28,7 @@ import { useToast } from "@/hooks/use-toast";
 import type { JobOrder, Customer, Motorcycle, Part, Service, Payment } from "@/types";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
-import { PAYMENT_STATUSES } from "@/lib/constants";
+import { PAYMENT_STATUSES, JOB_ORDER_STATUSES } from "@/lib/constants";
 
 // Initial mock data for job orders
 const initialJobOrders: JobOrder[] = [
@@ -36,7 +36,7 @@ const initialJobOrders: JobOrder[] = [
     id: "jo1",
     customerId: "1", // John Doe
     motorcycleId: "m1", // Honda CBR600RR
-    status: "In Progress",
+    status: JOB_ORDER_STATUSES.IN_PROGRESS,
     servicesPerformed: [
       { id: "jos1", serviceId: "svc1", serviceName: "Oil Change", laborCost: 50 }
     ],
@@ -58,7 +58,7 @@ const initialJobOrders: JobOrder[] = [
     id: "jo2",
     customerId: "2", // Jane Smith
     motorcycleId: "m2", // Yamaha MT-07
-    status: "Completed",
+    status: JOB_ORDER_STATUSES.COMPLETED,
     servicesPerformed: [
       { id: "jos2", serviceId: "svc2", serviceName: "Tire Replacement", laborCost: 150 }
     ],
@@ -89,28 +89,56 @@ if (typeof window !== 'undefined') {
         const totalLabor = jobOrderData.servicesPerformed.reduce((sum, s) => sum + s.laborCost, 0);
         const totalParts = jobOrderData.partsUsed.reduce((sum, p) => sum + p.totalPrice, 0);
         const discount = Number(jobOrderData.discountAmount) || 0;
-        const tax = Number(jobOrderData.taxAmount) || 0; 
+        
+        let taxRate = 0;
+        if(typeof window !== 'undefined' && (window as any).__settingsStore) {
+            taxRate = (window as any).__settingsStore.getSettings()?.defaultTaxRate || 0;
+        }
+        const subTotal = totalLabor + totalParts - discount;
+        const taxAmount = jobOrderData.taxAmount === undefined ? (subTotal * (taxRate / 100)) : Number(jobOrderData.taxAmount);
+
 
         const newJobOrder: JobOrder = {
           ...jobOrderData,
-          id: String(Date.now()),
-          grandTotal: totalLabor + totalParts - discount + tax,
-          amountPaid: 0,
+          id: String(Date.now()), // Simple ID generation
+          servicesPerformed: jobOrderData.servicesPerformed || [],
+          partsUsed: jobOrderData.partsUsed || [],
+          grandTotal: subTotal + taxAmount,
+          amountPaid: jobOrderData.paymentStatus === PAYMENT_STATUSES.PAID ? (subTotal + taxAmount) : 0, // If marked as paid initially
           paymentHistory: [],
-          // paymentStatus is set in the form, default or chosen by user
           createdAt: new Date(),
           updatedAt: new Date(),
-          createdByUserId: "current_user_placeholder", 
+          createdByUserId: "current_user_placeholder", // Replace with actual user ID
         };
+
+        if (newJobOrder.paymentStatus === PAYMENT_STATUSES.PAID && newJobOrder.amountPaid > 0 && newJobOrder.paymentHistory.length === 0) {
+            const initialPayment: Payment = {
+                id: String(Date.now() + 1), // ensure unique id
+                jobOrderId: newJobOrder.id,
+                amount: newJobOrder.amountPaid,
+                paymentDate: new Date(),
+                method: 'Cash', // Default or could be part of form
+                processedByUserId: newJobOrder.createdByUserId,
+                createdAt: new Date(),
+            };
+            newJobOrder.paymentHistory.push(initialPayment);
+            if(typeof window !== 'undefined' && (window as any).__paymentStore) {
+                (window as any).__paymentStore.addPayment(initialPayment);
+            }
+        }
+
+
         (window as any).__jobOrderStore.jobOrders.push(newJobOrder);
 
+        // Deduct inventory
         if ((window as any).__inventoryStore) {
           newJobOrder.partsUsed.forEach(item => {
             const partIndex = (window as any).__inventoryStore.parts.findIndex((p: Part) => p.id === item.partId);
             if (partIndex !== -1) {
               (window as any).__inventoryStore.parts[partIndex].stockQuantity -= item.quantity;
+              // TODO: Add a check here if stockQuantity < 0 and handle (e.g., toast warning)
               if ((window as any).__inventoryStore.parts[partIndex].stockQuantity < 0) {
-                console.warn(`Stock for part ${item.partName} is now negative.`);
+                console.warn(`Stock for part ${item.partName} (${item.partId}) is now negative: ${(window as any).__inventoryStore.parts[partIndex].stockQuantity}`);
               }
             }
           });
@@ -121,35 +149,42 @@ if (typeof window !== 'undefined') {
         const index = (window as any).__jobOrderStore.jobOrders.findIndex((jo: JobOrder) => jo.id === updatedJobOrder.id);
         if (index !== -1) {
           const oldJobOrder = (window as any).__jobOrderStore.jobOrders[index];
+          
+          // Recalculate grandTotal
           const totalLabor = updatedJobOrder.servicesPerformed.reduce((sum, s) => sum + s.laborCost, 0);
           const totalParts = updatedJobOrder.partsUsed.reduce((sum, p) => sum + p.totalPrice, 0);
           const discount = Number(updatedJobOrder.discountAmount) || 0;
-          const tax = Number(updatedJobOrder.taxAmount) || 0;
+          
+          let taxRate = 0;
+          if(typeof window !== 'undefined' && (window as any).__settingsStore) {
+              taxRate = (window as any).__settingsStore.getSettings()?.defaultTaxRate || 0;
+          }
+          const subTotal = totalLabor + totalParts - discount;
+          const taxAmount = updatedJobOrder.taxAmount === undefined ? (subTotal * (taxRate / 100)) : Number(updatedJobOrder.taxAmount);
 
           (window as any).__jobOrderStore.jobOrders[index] = {
              ...updatedJobOrder,
-             grandTotal: totalLabor + totalParts - discount + tax,
+             grandTotal: subTotal + taxAmount,
              updatedAt: new Date() 
             };
           
+          // Adjust inventory: Return old parts, deduct new parts
           if ((window as any).__inventoryStore) {
+            // Return quantities of parts that were on the old job order
             oldJobOrder.partsUsed.forEach(oldItem => {
-              const newItem = updatedJobOrder.partsUsed.find(ni => ni.partId === oldItem.partId);
               const partIndex = (window as any).__inventoryStore.parts.findIndex((p: Part) => p.id === oldItem.partId);
               if (partIndex !== -1) {
-                if (!newItem) { 
-                  (window as any).__inventoryStore.parts[partIndex].stockQuantity += oldItem.quantity;
-                } else if (newItem.quantity !== oldItem.quantity) { 
-                  (window as any).__inventoryStore.parts[partIndex].stockQuantity += (oldItem.quantity - newItem.quantity);
-                }
+                (window as any).__inventoryStore.parts[partIndex].stockQuantity += oldItem.quantity;
               }
             });
-             updatedJobOrder.partsUsed.forEach(newItem => {
-                const oldItem = oldJobOrder.partsUsed.find(oi => oi.partId === newItem.partId);
+
+            // Deduct quantities of parts on the updated job order
+            updatedJobOrder.partsUsed.forEach(newItem => {
                 const partIndex = (window as any).__inventoryStore.parts.findIndex((p: Part) => p.id === newItem.partId);
                 if(partIndex !== -1) {
-                    if(!oldItem) { 
-                         (window as any).__inventoryStore.parts[partIndex].stockQuantity -= newItem.quantity;
+                    (window as any).__inventoryStore.parts[partIndex].stockQuantity -= newItem.quantity;
+                     if ((window as any).__inventoryStore.parts[partIndex].stockQuantity < 0) {
+                        console.warn(`Stock for part ${newItem.partName} (${newItem.partId}) is now negative after update: ${(window as any).__inventoryStore.parts[partIndex].stockQuantity}`);
                     }
                 }
              });
@@ -159,8 +194,22 @@ if (typeof window !== 'undefined') {
         return false;
       },
       deleteJobOrder: (jobOrderId: string) => {
-        (window as any).__jobOrderStore.jobOrders = (window as any).__jobOrderStore.jobOrders.filter((jo: JobOrder) => jo.id !== jobOrderId);
-        return true;
+         const jobOrderIndex = (window as any).__jobOrderStore.jobOrders.findIndex((jo: JobOrder) => jo.id === jobOrderId);
+        if (jobOrderIndex !== -1) {
+            const jobOrderToDelete = (window as any).__jobOrderStore.jobOrders[jobOrderIndex];
+            // Return parts to inventory
+            if ((window as any).__inventoryStore && jobOrderToDelete.partsUsed) {
+                jobOrderToDelete.partsUsed.forEach(item => {
+                    const partIndex = (window as any).__inventoryStore.parts.findIndex((p: Part) => p.id === item.partId);
+                    if (partIndex !== -1) {
+                        (window as any).__inventoryStore.parts[partIndex].stockQuantity += item.quantity;
+                    }
+                });
+            }
+            (window as any).__jobOrderStore.jobOrders = (window as any).__jobOrderStore.jobOrders.filter((jo: JobOrder) => jo.id !== jobOrderId);
+            return true;
+        }
+        return false;
       },
       getJobOrderById: (jobOrderId: string) => {
         return (window as any).__jobOrderStore.jobOrders.find((jo: JobOrder) => jo.id === jobOrderId);
@@ -171,7 +220,9 @@ if (typeof window !== 'undefined') {
           const jobOrder = (window as any).__jobOrderStore.jobOrders[joIndex];
           jobOrder.paymentHistory.push(payment);
           jobOrder.amountPaid += payment.amount;
-          if (jobOrder.amountPaid >= jobOrder.grandTotal) {
+          // Ensure grandTotal is a number
+          const grandTotalNum = Number(jobOrder.grandTotal) || 0;
+          if (jobOrder.amountPaid >= grandTotalNum) {
             jobOrder.paymentStatus = PAYMENT_STATUSES.PAID;
           } else if (jobOrder.amountPaid > 0) {
             jobOrder.paymentStatus = PAYMENT_STATUSES.PARTIAL;
@@ -220,9 +271,12 @@ export default function JobOrdersPage() {
 
   const motorcycleMap = useMemo(() => {
     const map = new Map<string, string>();
-    motorcycles.forEach(m => map.set(m.id, `${m.make} ${m.model} (${m.plateNumber})`));
+    motorcycles.forEach(m => {
+        const customerName = m.customerId ? customerMap.get(m.customerId) || 'Unknown Owner' : 'Unknown Owner';
+        map.set(m.id, `${m.make} ${m.model} (${m.plateNumber || 'N/A'})`);
+    });
     return map;
-  }, [motorcycles]);
+  }, [motorcycles, customerMap]);
 
   const refreshJobOrders = () => {
     if (typeof window !== 'undefined' && (window as any).__jobOrderStore) {
@@ -235,6 +289,7 @@ export default function JobOrdersPage() {
     const interval = setInterval(() => {
       if (typeof window !== 'undefined' && (window as any).__jobOrderStore) {
         const storeJobOrders = (window as any).__jobOrderStore.jobOrders;
+        // A more robust check might be needed if nested objects change without changing array length/order
         if (JSON.stringify(storeJobOrders) !== JSON.stringify(jobOrders)) {
           refreshJobOrders();
         }
@@ -255,7 +310,7 @@ export default function JobOrdersPage() {
         refreshJobOrders();
         toast({
           title: "Job Order Deleted",
-          description: `Job Order #${jobOrderToDelete.id.substring(0,6)} has been successfully deleted.`,
+          description: `Job Order/Sale #${jobOrderToDelete.id.substring(0,6)} has been successfully deleted.`,
         });
       }
     }
@@ -274,9 +329,9 @@ export default function JobOrdersPage() {
           <div>
             <div className="flex items-center gap-3">
               <ClipboardList className="h-6 w-6 text-primary" />
-              <CardTitle className="font-headline text-2xl">Job Orders</CardTitle>
+              <CardTitle className="font-headline text-2xl">Job Orders & Sales</CardTitle>
             </div>
-            <CardDescription>Manage all workshop job orders.</CardDescription>
+            <CardDescription>Manage all workshop job orders and direct sales.</CardDescription>
           </div>
           <Button asChild>
             <Link href="/dashboard/job-orders/new">
@@ -291,7 +346,7 @@ export default function JobOrdersPage() {
                 <TableRow>
                   <TableHead>ID</TableHead>
                   <TableHead>Customer</TableHead>
-                  <TableHead>Motorcycle</TableHead>
+                  <TableHead>Motorcycle/Type</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Payment</TableHead>
                   <TableHead className="text-right">Total</TableHead>
@@ -303,11 +358,11 @@ export default function JobOrdersPage() {
                 {jobOrders.map((jo) => (
                   <TableRow key={jo.id}>
                     <TableCell className="font-medium">{`#${jo.id.substring(0,6)}`}</TableCell>
-                    <TableCell>{customerMap.get(jo.customerId) || "N/A"}</TableCell>
-                    <TableCell>{motorcycleMap.get(jo.motorcycleId) || "N/A"}</TableCell>
-                    <TableCell><Badge variant={jo.status === "Completed" ? "default" : "secondary"}>{jo.status}</Badge></TableCell>
+                    <TableCell>{jo.customerId ? customerMap.get(jo.customerId) || "N/A" : "Walk-in Sale"}</TableCell>
+                    <TableCell>{jo.motorcycleId ? motorcycleMap.get(jo.motorcycleId) || "N/A" : (jo.status === JOB_ORDER_STATUSES.SALE_COMPLETED ? "Direct Sale" : "N/A")}</TableCell>
+                    <TableCell><Badge variant={jo.status === JOB_ORDER_STATUSES.COMPLETED || jo.status === JOB_ORDER_STATUSES.SALE_COMPLETED ? "default" : "secondary"}>{jo.status}</Badge></TableCell>
                     <TableCell><Badge variant={jo.paymentStatus === PAYMENT_STATUSES.PAID ? "default" : (jo.paymentStatus === PAYMENT_STATUSES.UNPAID ? "destructive" : "secondary") }>{jo.paymentStatus}</Badge></TableCell>
-                    <TableCell className="text-right">${jo.grandTotal.toFixed(2)}</TableCell>
+                    <TableCell className="text-right">${(Number(jo.grandTotal) || 0).toFixed(2)}</TableCell>
                     <TableCell>{format(new Date(jo.createdAt), "MMM dd, yyyy")}</TableCell>
                     <TableCell className="text-right space-x-1">
                       <Button variant="ghost" size="icon" asChild className="hover:text-primary">
@@ -316,12 +371,14 @@ export default function JobOrdersPage() {
                           <span className="sr-only">View</span>
                         </Link>
                       </Button>
-                      <Button variant="ghost" size="icon" asChild className="hover:text-primary">
-                        <Link href={`/dashboard/job-orders/${jo.id}/edit`}>
-                          <Pencil className="h-4 w-4" />
-                          <span className="sr-only">Edit</span>
-                        </Link>
-                      </Button>
+                       {jo.status !== JOB_ORDER_STATUSES.SALE_COMPLETED && (
+                        <Button variant="ghost" size="icon" asChild className="hover:text-primary">
+                            <Link href={`/dashboard/job-orders/${jo.id}/edit`}>
+                            <Pencil className="h-4 w-4" />
+                            <span className="sr-only">Edit</span>
+                            </Link>
+                        </Button>
+                       )}
                       <Button 
                         variant="ghost" 
                         size="icon" 
@@ -339,8 +396,8 @@ export default function JobOrdersPage() {
           ) : (
             <div className="flex flex-col items-center justify-center gap-4 py-10 text-muted-foreground">
                 <ClipboardList className="h-16 w-16" />
-                <p className="text-lg">No job orders found.</p>
-                <p>Get started by creating a new job order.</p>
+                <p className="text-lg">No job orders or sales found.</p>
+                <p>Get started by creating a new job order or making a direct sale.</p>
             </div>
           )}
         </CardContent>
@@ -351,7 +408,8 @@ export default function JobOrdersPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
             <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete Job Order #{jobOrderToDelete?.id.substring(0,6)}.
+              This action cannot be undone. This will permanently delete Order/Sale #{jobOrderToDelete?.id.substring(0,6)}.
+              If this is a direct sale or a job order with parts, stock levels for those parts will be readjusted.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -365,4 +423,3 @@ export default function JobOrdersPage() {
     </div>
   );
 }
-

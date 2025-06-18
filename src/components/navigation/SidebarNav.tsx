@@ -1,3 +1,4 @@
+
 "use client";
 
 import Link from "next/link";
@@ -11,7 +12,8 @@ import {
   ClipboardList, 
   FileText, 
   Settings,
-  UserCog
+  UserCog,
+  ShoppingCart
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -22,6 +24,7 @@ import { Separator } from "@/components/ui/separator";
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/dashboard/job-orders", label: "Job Orders", icon: ClipboardList },
+  { href: "/dashboard/direct-sales", label: "Direct Sales", icon: ShoppingCart },
   { href: "/dashboard/customers", label: "Customers", icon: Users },
   { href: "/dashboard/motorcycles", label: "Motorcycles", icon: Bike },
   { href: "/dashboard/inventory", label: "Inventory", icon: Package },
@@ -66,3 +69,4 @@ export function SidebarNav({ collapsed }: { collapsed?: boolean }) {
     </div>
   );
 }
+

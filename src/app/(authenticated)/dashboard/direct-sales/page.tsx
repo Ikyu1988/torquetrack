@@ -1,0 +1,376 @@
+
+"use client";
+
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm, useFieldArray } from "react-hook-form";
+import * as z from "zod";
+import { Button } from "@/components/ui/button";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import Link from "next/link";
+import { ArrowLeft, ShoppingCart, DollarSign, PlusCircle, Trash2 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { useRouter } from "next/navigation";
+import type { JobOrder, Customer, Part, PaymentMethod, ShopSettings } from "@/types";
+import { useEffect, useState, useMemo } from "react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { JOB_ORDER_STATUSES, PAYMENT_STATUSES, PAYMENT_METHOD_OPTIONS } from "@/lib/constants";
+import { Separator } from "@/components/ui/separator";
+
+const directSalePartItemSchema = z.object({
+  id: z.string(), // Unique ID for this line item in the form
+  partId: z.string().min(1, "Part selection is required."),
+  partName: z.string(), // Auto-filled
+  quantity: z.coerce.number().int().min(1, "Quantity must be at least 1."),
+  pricePerUnit: z.coerce.number().min(0), // Auto-filled
+  totalPrice: z.coerce.number().min(0), // Auto-calculated
+});
+
+const directSaleFormSchema = z.object({
+  customerId: z.string().optional(), // Customer is optional
+  partsUsed: z.array(directSalePartItemSchema).min(1, { message: "At least one part must be added to the sale." }),
+  discountAmount: z.coerce.number().min(0, "Discount must be non-negative.").optional().or(z.literal('')),
+  paymentMethod: z.enum(PAYMENT_METHOD_OPTIONS),
+  paymentNotes: z.string().max(250).optional().or(z.literal('')),
+});
+
+type DirectSaleFormValues = z.infer<typeof directSaleFormSchema>;
+
+export default function DirectSalesPage() {
+  const { toast } = useToast();
+  const router = useRouter();
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [availableParts, setAvailableParts] = useState<Part[]>([]);
+  const [shopSettings, setShopSettings] = useState<ShopSettings | null>(null);
+  const [isMounted, setIsMounted] = useState(false);
+
+  const form = useForm<DirectSaleFormValues>({
+    resolver: zodResolver(directSaleFormSchema),
+    defaultValues: {
+      customerId: "",
+      partsUsed: [],
+      discountAmount: undefined,
+      paymentMethod: "Cash",
+      paymentNotes: "",
+    },
+  });
+
+  const { fields: partFields, append: appendPart, remove: removePart } = useFieldArray({
+    control: form.control,
+    name: "partsUsed",
+  });
+
+  const partsUsedWatch = form.watch("partsUsed");
+  const discountAmountWatch = form.watch("discountAmount") || 0;
+
+  const subTotalParts = useMemo(() => {
+    return partsUsedWatch.reduce((sum, item) => sum + (Number(item.totalPrice) || 0), 0);
+  }, [partsUsedWatch]);
+
+  const taxAmount = useMemo(() => {
+    if (!shopSettings || shopSettings.defaultTaxRate === undefined) return 0;
+    const currentSubTotal = subTotalParts - (Number(discountAmountWatch) || 0);
+    return currentSubTotal * (shopSettings.defaultTaxRate / 100);
+  }, [subTotalParts, discountAmountWatch, shopSettings]);
+
+  const grandTotal = useMemo(() => {
+    const currentSubTotal = subTotalParts - (Number(discountAmountWatch) || 0);
+    return currentSubTotal + taxAmount;
+  }, [subTotalParts, discountAmountWatch, taxAmount]);
+
+  useEffect(() => {
+    setIsMounted(true);
+    if (typeof window !== 'undefined') {
+      if ((window as any).__customerStore) setCustomers((window as any).__customerStore.customers);
+      if ((window as any).__inventoryStore) setAvailableParts((window as any).__inventoryStore.parts.filter((p: Part) => p.isActive && p.stockQuantity > 0));
+      if ((window as any).__settingsStore) setShopSettings((window as any).__settingsStore.getSettings());
+    }
+  }, []);
+
+  function onSubmit(data: DirectSaleFormValues) {
+    let newSaleOrder: JobOrder | null = null;
+    if (typeof window !== 'undefined' && (window as any).__jobOrderStore && (window as any).__paymentStore) {
+        const saleOrderData: Omit<JobOrder, 'id' | 'createdAt' | 'updatedAt' | 'createdByUserId' | 'grandTotal' | 'amountPaid' | 'paymentHistory'> & {grandTotal?: number} = {
+            customerId: data.customerId || undefined,
+            motorcycleId: undefined, // No motorcycle for direct sales
+            status: JOB_ORDER_STATUSES.SALE_COMPLETED,
+            servicesPerformed: [], // No services
+            partsUsed: data.partsUsed.map(p => ({...p})), // Ensure it's a new array of objects
+            diagnostics: "Direct Parts Sale",
+            discountAmount: data.discountAmount === '' ? undefined : Number(data.discountAmount),
+            taxAmount: taxAmount,
+            paymentStatus: PAYMENT_STATUSES.PAID, // Assume direct sales are paid immediately
+             // grandTotal will be calculated by addJobOrder, but we pass our calculation for reference/consistency
+        };
+      
+      newSaleOrder = (window as any).__jobOrderStore.addJobOrder(saleOrderData);
+
+      if (newSaleOrder) {
+         // Record payment for this new sale order
+         const paymentData = {
+            jobOrderId: newSaleOrder.id,
+            amount: newSaleOrder.grandTotal, // Paid in full
+            paymentDate: new Date(),
+            method: data.paymentMethod,
+            notes: data.paymentNotes || `Payment for direct sale #${newSaleOrder.id.substring(0,6)}`,
+            processedByUserId: "current_user_placeholder", // Replace with actual user ID
+        };
+        const savedPayment = (window as any).__paymentStore.addPayment(paymentData);
+        (window as any).__jobOrderStore.addPaymentToJobOrder(newSaleOrder.id, savedPayment);
+
+
+        toast({
+          title: "Sale Completed",
+          description: `Direct sale #${newSaleOrder.id.substring(0,6)} processed successfully.`,
+        });
+        form.reset({ customerId: "", partsUsed: [], discountAmount: undefined, paymentMethod: "Cash", paymentNotes: "" });
+        // Refresh available parts as stock might have changed
+        if ((window as any).__inventoryStore) {
+             setAvailableParts((window as any).__inventoryStore.parts.filter((p: Part) => p.isActive && p.stockQuantity > 0));
+        }
+
+        // Optional: Redirect to a receipt page or job order view
+        // router.push(`/dashboard/job-orders/${newSaleOrder.id}`); 
+      } else {
+         toast({
+          title: "Error",
+          description: "Failed to process sale. Please try again.",
+          variant: "destructive",
+        });
+      }
+    }
+  }
+  
+  if (!isMounted) {
+    return <div className="flex justify-center items-center h-screen"><p>Loading form...</p></div>;
+  }
+
+  return (
+    <div className="flex flex-col gap-6">
+      <Card className="shadow-lg">
+        <CardHeader>
+          <div className="flex items-center gap-3">
+            <ShoppingCart className="h-6 w-6 text-primary" />
+            <CardTitle className="font-headline text-2xl">Direct Parts Sale</CardTitle>
+          </div>
+          <CardDescription>Create a new sale for parts purchased by a walk-in customer.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+              <FormField
+                control={form.control}
+                name="customerId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Customer (Optional)</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value || ""}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a customer or leave for Walk-in" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="">Walk-in Customer</SelectItem>
+                        {customers.map(customer => (
+                          <SelectItem key={customer.id} value={customer.id}>
+                            {customer.firstName} {customer.lastName} ({customer.phone})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <Separator />
+              <div className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <h3 className="text-lg font-medium">Parts to Sell</h3>
+                  <Button type="button" variant="outline" size="sm" onClick={() => appendPart({ id: Date.now().toString(), partId: "", partName: "", quantity: 1, pricePerUnit: 0, totalPrice: 0 })}>
+                    <PlusCircle className="mr-2 h-4 w-4" /> Add Part
+                  </Button>
+                </div>
+                {partFields.map((item, index) => (
+                  <Card key={item.id} className="p-4 space-y-4 bg-muted/30">
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                       <FormField
+                        control={form.control}
+                        name={`partsUsed.${index}.partId`}
+                        render={({ field }) => (
+                          <FormItem className="md:col-span-2">
+                            <FormLabel>Part</FormLabel>
+                            <Select 
+                              onValueChange={(value) => {
+                                field.onChange(value);
+                                const selectedPart = availableParts.find(p => p.id === value);
+                                form.setValue(`partsUsed.${index}.partName`, selectedPart?.name || "");
+                                form.setValue(`partsUsed.${index}.pricePerUnit`, selectedPart?.price || 0);
+                                const qty = form.getValues(`partsUsed.${index}.quantity`) || 1;
+                                form.setValue(`partsUsed.${index}.totalPrice`, (selectedPart?.price || 0) * qty);
+                              }} 
+                              value={field.value}
+                            >
+                              <FormControl><SelectTrigger><SelectValue placeholder="Select a part" /></SelectTrigger></FormControl>
+                              <SelectContent>
+                                {availableParts.length === 0 && <SelectItem value="loading" disabled>No parts available or in stock.</SelectItem>}
+                                {availableParts.map(part => (
+                                  <SelectItem key={part.id} value={part.id}>{part.name} (Stock: {part.stockQuantity}, Price: {shopSettings?.currencySymbol || '$'}{part.price.toFixed(2)})</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name={`partsUsed.${index}.quantity`}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Quantity</FormLabel>
+                            <FormControl>
+                              <Input 
+                                type="number"
+                                min="1"
+                                {...field} 
+                                onChange={e => {
+                                  const qty = parseInt(e.target.value, 10) || 0;
+                                  field.onChange(qty);
+                                  const pricePerUnit = form.getValues(`partsUsed.${index}.pricePerUnit`) || 0;
+                                  form.setValue(`partsUsed.${index}.totalPrice`, pricePerUnit * qty);
+                                }}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                       <FormItem>
+                          <FormLabel>Total Price</FormLabel>
+                          <div className="relative">
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground">{shopSettings?.currencySymbol || '$'}</span>
+                            <Input 
+                              type="number" 
+                              value={form.getValues(`partsUsed.${index}.totalPrice`).toFixed(2)} 
+                              readOnly 
+                              className="pl-7 bg-background" 
+                            />
+                          </div>
+                        </FormItem>
+                    </div>
+                    <Button type="button" variant="ghost" size="sm" onClick={() => removePart(index)} className="text-destructive hover:text-destructive/90">
+                       <Trash2 className="mr-2 h-4 w-4" /> Remove Part
+                    </Button>
+                  </Card>
+                ))}
+                {partFields.length === 0 && <p className="text-sm text-muted-foreground p-4 text-center">No parts added to the sale yet.</p>}
+              </div>
+
+              <Separator />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+                <Card className="bg-muted/20 p-2">
+                    <CardHeader className="p-2 pb-0"><CardTitle className="text-lg">Sale Summary</CardTitle></CardHeader>
+                    <CardContent className="p-2 space-y-2">
+                        <div className="flex justify-between items-center">
+                            <span className="text-sm font-medium">Subtotal (Parts):</span>
+                            <span className="text-sm font-semibold">{shopSettings?.currencySymbol || '$'}{subTotalParts.toFixed(2)}</span>
+                        </div>
+                        <FormField
+                        control={form.control}
+                        name="discountAmount"
+                        render={({ field }) => (
+                            <FormItem className="flex justify-between items-center">
+                            <FormLabel className="text-sm font-medium">Discount:</FormLabel>
+                            <div className="relative w-32">
+                                <span className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground">{shopSettings?.currencySymbol || '$'}</span>
+                                <Input 
+                                type="number" step="0.01" placeholder="0.00" {...field} 
+                                className="pl-6 h-8 text-sm" 
+                                onChange={e => field.onChange(e.target.value === '' ? '' : parseFloat(e.target.value) || 0)} />
+                            </div>
+                            <FormMessage className="text-xs col-span-full" />
+                            </FormItem>
+                        )}
+                        />
+                         {shopSettings?.defaultTaxRate !== undefined && shopSettings.defaultTaxRate > 0 && (
+                            <div className="flex justify-between items-center">
+                                <span className="text-sm font-medium">Tax ({shopSettings.defaultTaxRate}%):</span>
+                                <span className="text-sm font-semibold">{shopSettings?.currencySymbol || '$'}{taxAmount.toFixed(2)}</span>
+                            </div>
+                        )}
+                        <Separator className="my-2"/>
+                        <div className="flex justify-between items-center pt-1">
+                            <span className="text-lg font-semibold text-primary">Grand Total:</span>
+                            <span className="text-xl font-bold text-primary">{shopSettings?.currencySymbol || '$'}{grandTotal.toFixed(2)}</span>
+                        </div>
+                    </CardContent>
+                </Card>
+
+                <Card className="bg-muted/20 p-2">
+                    <CardHeader className="p-2 pb-0"><CardTitle className="text-lg">Payment Details</CardTitle></CardHeader>
+                    <CardContent className="p-2 space-y-4">
+                        <FormField
+                            control={form.control}
+                            name="paymentMethod"
+                            render={({ field }) => (
+                                <FormItem>
+                                <FormLabel>Payment Method</FormLabel>
+                                <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value}>
+                                    <FormControl>
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Select payment method" />
+                                    </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                    {PAYMENT_METHOD_OPTIONS.map(method => (
+                                        <SelectItem key={method} value={method}>{method}</SelectItem>
+                                    ))}
+                                    </SelectContent>
+                                </Select>
+                                <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                        <FormField
+                            control={form.control}
+                            name="paymentNotes"
+                            render={({ field }) => (
+                                <FormItem>
+                                <FormLabel>Payment Notes (Optional)</FormLabel>
+                                <FormControl>
+                                    <Textarea placeholder="e.g., Reference number, quick note" {...field} rows={2} />
+                                </FormControl>
+                                <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                    </CardContent>
+                </Card>
+              </div>
+              
+              <div className="flex justify-end gap-4 pt-4">
+                <Button type="button" variant="outline" onClick={() => router.push("/dashboard")}>
+                  Cancel Sale
+                </Button>
+                <Button type="submit" disabled={form.formState.isSubmitting || grandTotal <= 0 || partFields.length === 0} size="lg">
+                  {form.formState.isSubmitting ? "Processing..." : `Complete Sale (${shopSettings?.currencySymbol || '$'}${grandTotal.toFixed(2)})`}
+                </Button>
+              </div>
+            </form>
+          </Form>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
