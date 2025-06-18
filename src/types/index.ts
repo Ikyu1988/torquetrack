@@ -68,34 +68,39 @@ export interface Part {
   updatedAt: Date;
 }
 
-export interface JobOrderService {
-  serviceId: string;
-  serviceName: string; // Denormalized for display
+// Simplified for initial Job Order pass, can be expanded later
+export interface JobOrderServiceItem {
+  serviceIdRef?: string; // Optional link to a Service
+  description: string;
+  laborCost: number;
   assignedMechanicId?: string;
-  laborCost: number; // Can be overridden from service default
-  estimatedHours?: number;
-  commission?: number; // Calculated commission for this service
   notes?: string;
 }
 
-export interface JobOrderPart {
-  partId: string;
-  partName: string; // Denormalized for display
+export interface JobOrderPartItem {
+  partIdRef?: string; // Optional link to a Part
+  description: string;
   quantity: number;
-  pricePerUnit: number; // Can be overridden from part default
-  totalPrice: number;
+  pricePerUnit: number;
+  totalPrice: number; // quantity * pricePerUnit
 }
 
 export interface JobOrder {
-  id: string; // Unique Job Order ID
+  id: string; 
   customerId: string;
   motorcycleId: string;
   status: JobOrderStatus;
-  services: JobOrderService[];
-  partsUsed: JobOrderPart[];
-  notes?: string;
+  
+  // Simplified fields for initial implementation
+  servicesDescription?: string; 
+  partsDescription?: string;    
+
+  // Detailed items - can be populated based on simplified fields or future UI
+  // servicesPerformed: JobOrderServiceItem[]; 
+  // partsUsed: JobOrderPartItem[];          
+
   diagnostics?: string;
-  images?: string[]; // URLs of attached images
+  images?: string[]; 
   estimatedCompletionDate?: Date;
   actualCompletionDate?: Date;
   totalLaborCost: number;
@@ -106,7 +111,7 @@ export interface JobOrder {
   paymentStatus: PaymentStatus;
   createdAt: Date;
   updatedAt: Date;
-  createdByUserId: string; // User who created the job order
+  createdByUserId: string; 
 }
 
 export interface Mechanic {
@@ -123,7 +128,7 @@ export interface Payment {
   jobOrderId: string;
   amount: number;
   paymentDate: Date;
-  paymentMethod: string; // e.g., Cash, Card, Online
+  paymentMethod: string; 
   notes?: string;
   processedByUserId: string;
 }
