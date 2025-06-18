@@ -17,7 +17,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Settings as SettingsIcon, Building, DollarSign, Palette, ToggleLeft, Image as ImageIcon, AlertTriangle } from "lucide-react";
+import { Settings as SettingsIcon, Building, DollarSign, Palette, ToggleLeft, Image as ImageIcon, AlertTriangle, Database } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { ShopSettings, ModuleSettings } from "@/types";
 import { useEffect, useState, useCallback } from "react";
@@ -28,7 +28,8 @@ import { Switch } from "@/components/ui/switch";
 const moduleSettingsSchema = z.object({
   reportsEnabled: z.boolean().default(true),
   directSalesEnabled: z.boolean().default(true),
-}).default({ reportsEnabled: true, directSalesEnabled: true });
+  purchaseOrdersEnabled: z.boolean().default(true),
+}).default({ reportsEnabled: true, directSalesEnabled: true, purchaseOrdersEnabled: true });
 
 
 const settingsFormSchema = z.object({
@@ -39,6 +40,7 @@ const settingsFormSchema = z.object({
   shopLogoUrl: z.string().url("Invalid URL format for logo.").max(255).optional().or(z.literal('')),
   
   currencySymbol: z.string().min(1, "Currency symbol is required.").max(5),
+  currencyCode: z.string().min(3, "Currency code (e.g. PHP, USD) is required.").max(5).optional().or(z.literal('')),
   defaultTaxRate: z.preprocess(
     (val) => (val === "" || val === undefined || val === null || isNaN(Number(val))) ? undefined : parseFloat(String(val)),
     z.number().min(0, "Tax rate must be non-negative.").max(100, "Tax rate cannot exceed 100%.").optional()
@@ -61,12 +63,14 @@ const initialSettings: ShopSettings = {
   shopEmail: "contact@torquetrack.ph",
   shopLogoUrl: "",
   currencySymbol: "₱", 
+  currencyCode: "PHP",
   defaultTaxRate: 12, 
   defaultLaborRate: 500, 
   theme: 'dark', 
   moduleSettings: {
     reportsEnabled: true,
     directSalesEnabled: true,
+    purchaseOrdersEnabled: true,
   },
   updatedAt: new Date(),
 };
@@ -106,12 +110,14 @@ export default function SettingsPage() {
       shopEmail: "",
       shopLogoUrl: "",
       currencySymbol: "₱", 
+      currencyCode: "PHP",
       defaultTaxRate: undefined,
       defaultLaborRate: undefined,
       theme: 'dark',
       moduleSettings: {
         reportsEnabled: true,
         directSalesEnabled: true,
+        purchaseOrdersEnabled: true,
       },
     },
   });
@@ -154,12 +160,14 @@ export default function SettingsPage() {
           shopEmail: currentSettings.shopEmail || "",
           shopLogoUrl: currentSettings.shopLogoUrl || "",
           currencySymbol: currentSettings.currencySymbol,
+          currencyCode: currentSettings.currencyCode || "PHP",
           defaultTaxRate: currentSettings.defaultTaxRate === undefined ? undefined : currentSettings.defaultTaxRate,
           defaultLaborRate: currentSettings.defaultLaborRate === undefined ? undefined : currentSettings.defaultLaborRate,
           theme: themeToUse,
           moduleSettings: {
             reportsEnabled: currentSettings.moduleSettings?.reportsEnabled ?? true,
             directSalesEnabled: currentSettings.moduleSettings?.directSalesEnabled ?? true,
+            purchaseOrdersEnabled: currentSettings.moduleSettings?.purchaseOrdersEnabled ?? true,
           },
         });
       } else { 
@@ -335,6 +343,19 @@ export default function SettingsPage() {
                         </FormItem>
                       )}
                     />
+                     <FormField
+                      control={form.control}
+                      name="currencyCode"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Currency Code (e.g. PHP, USD)</FormLabel>
+                          <FormControl>
+                            <Input placeholder="PHP" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
                     <FormField
                       control={form.control}
                       name="defaultTaxRate"
@@ -454,6 +475,24 @@ export default function SettingsPage() {
                             <div className="space-y-0.5">
                             <FormLabel className="text-base">Direct Sales Module</FormLabel>
                             <FormDescription>Enable or disable the direct parts sales page.</FormDescription>
+                            </div>
+                            <FormControl>
+                            <Switch
+                                checked={field.value}
+                                onCheckedChange={field.onChange}
+                            />
+                            </FormControl>
+                        </FormItem>
+                        )}
+                    />
+                    <FormField
+                        control={form.control}
+                        name="moduleSettings.purchaseOrdersEnabled"
+                        render={({ field }) => (
+                        <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4 shadow-sm">
+                            <div className="space-y-0.5">
+                            <FormLabel className="text-base">Purchase Orders & Suppliers</FormLabel>
+                            <FormDescription>Enable or disable modules for managing purchases and suppliers.</FormDescription>
                             </div>
                             <FormControl>
                             <Switch

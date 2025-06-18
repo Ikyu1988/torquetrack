@@ -1,5 +1,5 @@
 
-import type { UserRole, JobOrderStatus, PaymentStatus, CommissionType, PaymentMethod } from '@/lib/constants';
+import type { UserRole, JobOrderStatus, PaymentStatus, CommissionType, PaymentMethod, PurchaseRequisitionStatus, PurchaseOrderStatus, GoodsReceiptStatus } from '@/lib/constants';
 
 export interface User {
   id: string;
@@ -59,7 +59,7 @@ export interface Part {
   sku?: string; // Stock Keeping Unit
   price: number; // Selling price
   cost?: number; // Purchase cost
-  supplier?: string;
+  supplier?: string; // Supplier name, or could be changed to supplierId if Supplier becomes a full entity
   stockQuantity: number;
   minStockAlert?: number;
   notes?: string;
@@ -139,6 +139,7 @@ export interface Mechanic {
 export interface ModuleSettings {
   reportsEnabled?: boolean;
   directSalesEnabled?: boolean;
+  purchaseOrdersEnabled?: boolean;
   // Add more modules as needed
 }
 
@@ -149,6 +150,7 @@ export interface ShopSettings {
   shopEmail?: string;
   shopLogoUrl?: string; // URL to the logo, actual upload not handled
   currencySymbol: string; 
+  currencyCode?: string; // e.g. PHP, USD
   defaultTaxRate?: number; // as a percentage, e.g., 10 for 10%
   defaultLaborRate?: number; // Default hourly labor rate for the shop
   theme: 'light' | 'dark'; // Theme preference
@@ -156,3 +158,99 @@ export interface ShopSettings {
   updatedAt?: Date;
 }
 
+// --- Purchase Order Management ---
+export interface Supplier {
+  id: string;
+  name: string;
+  contactPerson?: string;
+  email?: string;
+  phone?: string;
+  address?: string;
+  productCatalogNotes?: string; // Simplified: notes about products/pricing
+  performanceNotes?: string; // Simplified: notes about performance
+  isActive: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface PurchaseRequisitionItem {
+  id: string; // Unique ID for this item in the requisition
+  partId?: string; // If requesting an existing part
+  partName?: string; // If partId is known, this can be auto-filled or a new description
+  description: string; // Required: description of item needed
+  quantity: number;
+  estimatedPricePerUnit?: number; // Optional
+  notes?: string;
+}
+
+export interface PurchaseRequisition {
+  id: string;
+  requestedByUserId: string; // User who submitted
+  department?: string; // Optional
+  status: PurchaseRequisitionStatus;
+  items: PurchaseRequisitionItem[];
+  totalEstimatedValue?: number; // Calculated from items
+  notes?: string;
+  submittedDate: Date;
+  approvedDate?: Date;
+  approvedByUserId?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface PurchaseOrderItem {
+  id: string; // Unique ID for this item in the PO
+  partId: string; // Reference to Part.id (assuming POs are for existing parts)
+  partName: string; // Denormalized
+  description: string; // From part or requisition
+  quantity: number;
+  unitPrice: number; // Agreed price with supplier
+  totalPrice: number; // quantity * unitPrice
+}
+
+export interface PurchaseOrder {
+  id: string;
+  purchaseRequisitionId?: string; // Optional: if generated from a requisition
+  supplierId: string;
+  orderDate: Date;
+  expectedDeliveryDate?: Date;
+  items: PurchaseOrderItem[];
+  subTotal: number;
+  taxAmount?: number; // Can be applied based on supplier/region
+  shippingCost?: number;
+  grandTotal: number;
+  paymentTerms?: string;
+  shippingAddress?: string;
+  billingAddress?: string;
+  status: PurchaseOrderStatus;
+  notes?: string;
+  createdAt: Date;
+  updatedAt: Date;
+  createdByUserId: string;
+}
+
+// --- Receiving & Inventory Management ---
+export interface GoodsReceiptItem {
+  id: string;
+  purchaseOrderItemId: string; // Link back to the PO item
+  partId: string;
+  partName: string;
+  quantityOrdered: number;
+  quantityReceived: number;
+  condition?: string; // e.g., "Good", "Damaged"
+  notes?: string;
+}
+
+export interface GoodsReceipt {
+  id: string;
+  purchaseOrderId: string;
+  supplierId: string; // Denormalized for easier lookup
+  receivedDate: Date;
+  receivedByUserId: string;
+  items: GoodsReceiptItem[];
+  status: GoodsReceiptStatus;
+  notes?: string; // e.g., "Partial delivery", "All items received in good condition"
+  discrepancies?: string; // Notes on any issues
+  createdAt: Date;
+  updatedAt: Date;
+}

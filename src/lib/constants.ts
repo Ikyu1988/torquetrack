@@ -51,3 +51,40 @@ export const PAYMENT_METHODS = {
 
 export type PaymentMethod = typeof PAYMENT_METHODS[keyof typeof PAYMENT_METHODS];
 export const PAYMENT_METHOD_OPTIONS = Object.values(PAYMENT_METHODS);
+
+
+// --- Purchase Order Management ---
+export const PURCHASE_REQUISITION_STATUSES = {
+  DRAFT: 'Draft',
+  PENDING_APPROVAL: 'Pending Approval',
+  APPROVED: 'Approved',
+  REJECTED: 'Rejected',
+  ORDERED: 'Ordered', // If PO generated from it
+  CANCELLED: 'Cancelled',
+} as const;
+export type PurchaseRequisitionStatus = typeof PURCHASE_REQUISITION_STATUSES[keyof typeof PURCHASE_REQUISITION_STATUSES];
+export const PURCHASE_REQUISITION_STATUS_OPTIONS = Object.values(PURCHASE_REQUISITION_STATUSES);
+
+
+export const PURCHASE_ORDER_STATUSES = {
+  DRAFT: 'Draft',
+  PENDING_APPROVAL: 'Pending Approval', // Optional, if POs also need approval
+  APPROVED: 'Approved', // Or "Sent to Supplier"
+  PARTIALLY_RECEIVED: 'Partially Received',
+  FULLY_RECEIVED: 'Fully Received',
+  CLOSED: 'Closed', // All items received and paid
+  CANCELLED: 'Cancelled',
+} as const;
+export type PurchaseOrderStatus = typeof PURCHASE_ORDER_STATUSES[keyof typeof PURCHASE_ORDER_STATUSES];
+export const PURCHASE_ORDER_STATUS_OPTIONS = Object.values(PURCHASE_ORDER_STATUSES);
+
+
+// --- Receiving & Inventory Management ---
+export const GOODS_RECEIPT_STATUSES = {
+  PENDING: 'Pending', // Awaiting verification
+  COMPLETED: 'Completed', // Goods verified and stock updated
+  PARTIAL: 'Partial', // For partial receipts against a PO
+  CANCELLED: 'Cancelled',
+} as const;
+export type GoodsReceiptStatus = typeof GOODS_RECEIPT_STATUSES[keyof typeof GOODS_RECEIPT_STATUSES];
+export const GOODS_RECEIPT_STATUS_OPTIONS = Object.values(GOODS_RECEIPT_STATUSES);
