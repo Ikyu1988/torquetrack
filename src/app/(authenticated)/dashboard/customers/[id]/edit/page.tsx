@@ -17,10 +17,11 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import Link from "next/link";
-import { ArrowLeft, Users } from "lucide-react";
+import { ArrowLeft, UserCheck } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { useRouter } from "next/navigation"; 
-import type { Customer } from "@/types"; // For type consistency
+import { useRouter, useParams } from "next/navigation";
+import type { Customer } from "@/types";
+import { useEffect, useState } from "react";
 
 const customerFormSchema = z.object({
   firstName: z.string().min(1, { message: "First name is required." }).max(50, { message: "First name must be 50 characters or less." }),
@@ -33,9 +34,13 @@ const customerFormSchema = z.object({
 
 type CustomerFormValues = z.infer<typeof customerFormSchema>;
 
-export default function NewCustomerPage() {
+export default function EditCustomerPage() {
   const { toast } = useToast();
   const router = useRouter();
+  const params = useParams();
+  const customerId = params.id as string;
+  const [isLoading, setIsLoading] = useState(true);
+  const [isMounted, setIsMounted] = useState(false);
 
   const form = useForm<CustomerFormValues>({
     resolver: zodResolver(customerFormSchema),
@@ -49,32 +54,82 @@ export default function NewCustomerPage() {
     },
   });
 
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (customerId && isMounted) {
+      setIsLoading(true);
+      // Simulate fetching customer data
+      let customerData: Customer | undefined;
+      if (typeof window !== 'undefined' && (window as any).__customerStore) {
+        customerData = (window as any).__customerStore.getCustomerById(customerId);
+      }
+
+      if (customerData) {
+        form.reset({
+          firstName: customerData.firstName,
+          lastName: customerData.lastName,
+          email: customerData.email || "",
+          phone: customerData.phone,
+          address: customerData.address || "",
+          notes: customerData.notes || "",
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: "Customer not found.",
+          variant: "destructive",
+        });
+        router.push("/dashboard/customers");
+      }
+      setIsLoading(false);
+    }
+  }, [customerId, form, router, toast, isMounted]);
+
   function onSubmit(data: CustomerFormValues) {
-    // Simulate API call to save customer
-    let newCustomer: Customer | null = null;
+    // Simulate API call to update customer
+    let success = false;
     if (typeof window !== 'undefined' && (window as any).__customerStore) {
-      newCustomer = (window as any).__customerStore.addCustomer(data);
+      const existingCustomer = (window as any).__customerStore.getCustomerById(customerId);
+      if (existingCustomer) {
+        const updatedCustomerData: Customer = {
+          ...existingCustomer,
+          ...data,
+          updatedAt: new Date(),
+        };
+        success = (window as any).__customerStore.updateCustomer(updatedCustomerData);
+      }
     }
 
-    if (newCustomer) {
+    if (success) {
       toast({
-        title: "Customer Created",
-        description: `${data.firstName} ${data.lastName} has been successfully added.`,
+        title: "Customer Updated",
+        description: `${data.firstName} ${data.lastName} has been successfully updated.`,
       });
-      router.push("/dashboard/customers"); 
-      // form.reset(); // Reset form after submission if not redirecting
+      router.push("/dashboard/customers");
     } else {
        toast({
         title: "Error",
-        description: "Failed to create customer. Please try again.",
+        description: "Failed to update customer. Please try again.",
         variant: "destructive",
       });
     }
   }
+  
+  if (!isMounted) {
+    return <div className="flex justify-center items-center h-screen"><p>Loading...</p></div>;
+  }
+
+
+  if (isLoading) {
+    return <div className="flex justify-center items-center h-screen"><p>Loading customer data...</p></div>;
+  }
 
   return (
     <div className="flex flex-col gap-6">
-       <div className="mb-4">
+      <div className="mb-4">
         <Button variant="outline" asChild>
           <Link href="/dashboard/customers">
             <ArrowLeft className="mr-2 h-4 w-4" />
@@ -85,10 +140,10 @@ export default function NewCustomerPage() {
       <Card className="shadow-lg">
         <CardHeader>
           <div className="flex items-center gap-3">
-            <Users className="h-6 w-6 text-primary" />
-            <CardTitle className="font-headline text-2xl">Create New Customer</CardTitle>
+            <UserCheck className="h-6 w-6 text-primary" />
+            <CardTitle className="font-headline text-2xl">Edit Customer</CardTitle>
           </div>
-          <CardDescription>Fill in the details below to add a new customer.</CardDescription>
+          <CardDescription>Update the details for this customer.</CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...form}>
@@ -187,7 +242,7 @@ export default function NewCustomerPage() {
                   Cancel
                 </Button>
                 <Button type="submit" disabled={form.formState.isSubmitting}>
-                  {form.formState.isSubmitting ? "Saving..." : "Save Customer"}
+                  {form.formState.isSubmitting ? "Saving..." : "Save Changes"}
                 </Button>
               </div>
             </form>

@@ -1,4 +1,7 @@
 
+"use client";
+
+import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PlusCircle, Users, Pencil, Trash2 } from "lucide-react";
@@ -11,9 +14,21 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import type { Customer } from "@/types"; // Assuming Customer type is defined
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { useToast } from "@/hooks/use-toast";
+import type { Customer } from "@/types";
 
-const dummyCustomers: Customer[] = [
+const initialCustomers: Customer[] = [
   {
     id: "1",
     firstName: "John",
@@ -39,13 +54,117 @@ const dummyCustomers: Customer[] = [
     firstName: "Alice",
     lastName: "Johnson",
     phone: "555-8765",
-    // email is optional
     createdAt: new Date(),
     updatedAt: new Date(),
   },
 ];
 
+// This would typically come from a global state/context or be managed by a library like React Query
+// For simulation, we'll use a simple in-memory store that can be "updated" by other pages.
+if (typeof window !== 'undefined') {
+  if (!(window as any).__customerStore) {
+    (window as any).__customerStore = {
+      customers: [...initialCustomers],
+      addCustomer: (customer: Omit<Customer, 'id' | 'createdAt' | 'updatedAt'>) => {
+        const newCustomer: Customer = {
+          ...customer,
+          id: String(Date.now()),
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        };
+        (window as any).__customerStore.customers.push(newCustomer);
+        return newCustomer;
+      },
+      updateCustomer: (updatedCustomer: Customer) => {
+        const index = (window as any).__customerStore.customers.findIndex((c: Customer) => c.id === updatedCustomer.id);
+        if (index !== -1) {
+          (window as any).__customerStore.customers[index] = { ...updatedCustomer, updatedAt: new Date() };
+          return true;
+        }
+        return false;
+      },
+      deleteCustomer: (customerId: string) => {
+        (window as any).__customerStore.customers = (window as any).__customerStore.customers.filter((c: Customer) => c.id !== customerId);
+        return true;
+      },
+      getCustomerById: (customerId: string) => {
+        return (window as any).__customerStore.customers.find((c: Customer) => c.id === customerId);
+      }
+    };
+  }
+}
+
+
 export default function CustomersPage() {
+  const { toast } = useToast();
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [customerToDelete, setCustomerToDelete] = useState<Customer | null>(null);
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+    if (typeof window !== 'undefined' && (window as any).__customerStore) {
+      setCustomers([...(window as any).__customerStore.customers]);
+    }
+  }, []);
+
+  // Function to refresh customers from the pseudo-store
+  const refreshCustomers = () => {
+    if (typeof window !== 'undefined' && (window as any).__customerStore) {
+      setCustomers([...(window as any).__customerStore.customers]);
+    }
+  };
+
+  // Periodically check for updates from the pseudo-store (e.g., after adding/editing)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (typeof window !== 'undefined' && (window as any).__customerStore) {
+        const storeCustomers = (window as any).__customerStore.customers;
+        if (JSON.stringify(storeCustomers) !== JSON.stringify(customers)) {
+          refreshCustomers();
+        }
+      }
+    }, 1000); // Check every second
+    return () => clearInterval(interval);
+  }, [customers]);
+
+
+  const handleDeleteCustomer = (customer: Customer) => {
+    setCustomerToDelete(customer);
+    setShowDeleteDialog(true);
+  };
+
+  const confirmDelete = () => {
+    if (customerToDelete) {
+      if (typeof window !== 'undefined' && (window as any).__customerStore) {
+        (window as any).__customerStore.deleteCustomer(customerToDelete.id);
+        refreshCustomers();
+        toast({
+          title: "Customer Deleted",
+          description: `${customerToDelete.firstName} ${customerToDelete.lastName} has been successfully deleted.`,
+        });
+      }
+    }
+    setShowDeleteDialog(false);
+    setCustomerToDelete(null);
+  };
+  
+  if (!isMounted && typeof window !== 'undefined') {
+    // Initial load from store on client
+     if ((window as any).__customerStore) {
+      setCustomers([...(window as any).__customerStore.customers]);
+    }
+    setIsMounted(true);
+  }
+
+
+  if (!isMounted) {
+    // Or a loading skeleton
+    return <p>Loading customers...</p>; 
+  }
+
+
   return (
     <div className="flex flex-col gap-6">
       <Card className="shadow-lg">
@@ -64,7 +183,7 @@ export default function CustomersPage() {
           </Button>
         </CardHeader>
         <CardContent>
-          {dummyCustomers.length > 0 ? (
+          {customers.length > 0 ? (
             <Table>
               <TableHeader>
                 <TableRow>
@@ -75,7 +194,7 @@ export default function CustomersPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {dummyCustomers.map((customer) => (
+                {customers.map((customer) => (
                   <TableRow key={customer.id}>
                     <TableCell className="font-medium">{`${customer.firstName} ${customer.lastName}`}</TableCell>
                     <TableCell>{customer.email || "-"}</TableCell>
@@ -87,7 +206,12 @@ export default function CustomersPage() {
                           <span className="sr-only">Edit</span>
                         </Link>
                       </Button>
-                      <Button variant="ghost" size="icon" className="hover:text-destructive">
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="hover:text-destructive"
+                        onClick={() => handleDeleteCustomer(customer)}
+                      >
                         <Trash2 className="h-4 w-4" />
                         <span className="sr-only">Delete</span>
                       </Button>
@@ -105,6 +229,24 @@ export default function CustomersPage() {
           )}
         </CardContent>
       </Card>
+
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the customer 
+              "{customerToDelete?.firstName} {customerToDelete?.lastName}" from your records.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setCustomerToDelete(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete} className="bg-destructive hover:bg-destructive/90">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
