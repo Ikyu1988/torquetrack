@@ -64,6 +64,8 @@ export interface Part {
   minStockAlert?: number;
   notes?: string;
   isActive: boolean;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 export interface JobOrderService {
@@ -125,4 +127,3 @@ export interface Payment {
   notes?: string;
   processedByUserId: string;
 }
-
