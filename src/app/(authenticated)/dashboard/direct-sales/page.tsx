@@ -16,7 +16,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ShoppingCart, PlusCircle, Trash2 } from "lucide-react";
+import { ShoppingCart, PlusCircle, Trash2, Printer } from "lucide-react"; // Added Printer
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
 import type { JobOrder, Customer, Part, PaymentMethod, ShopSettings } from "@/types";
@@ -197,7 +197,7 @@ export default function DirectSalesPage() {
               <div className="space-y-4">
                 <div className="flex justify-between items-center">
                   <h3 className="text-lg font-medium">Parts to Sell</h3>
-                  <Button type="button" variant="outline" size="sm" onClick={() => appendPart({ id: Date.now().toString(), partId: "", partName: "", quantity: 1, pricePerUnit: 0, totalPrice: 0 })}>
+                  <Button type="button" variant="outline" size="sm" onClick={() => appendPart({ id: Date.now().toString(), partId: "", partName: "", quantity: 1, pricePerUnit: 0, totalPrice: 0 })} className="print:hidden">
                     <PlusCircle className="mr-2 h-4 w-4" /> Add Part
                   </Button>
                 </div>
@@ -269,7 +269,7 @@ export default function DirectSalesPage() {
                           </div>
                         </FormItem>
                     </div>
-                    <Button type="button" variant="ghost" size="sm" onClick={() => removePart(index)} className="text-destructive hover:text-destructive/90">
+                    <Button type="button" variant="ghost" size="sm" onClick={() => removePart(index)} className="text-destructive hover:text-destructive/90 print:hidden">
                        <Trash2 className="mr-2 h-4 w-4" /> Remove Part
                     </Button>
                   </Card>
@@ -379,7 +379,10 @@ export default function DirectSalesPage() {
                 </Card>
               </div>
               
-              <div className="flex justify-end gap-4 pt-4">
+              <div className="flex justify-end gap-4 pt-4 print:hidden">
+                <Button type="button" variant="outline" onClick={() => window.print()}>
+                  <Printer className="mr-2 h-4 w-4" /> Print Form
+                </Button>
                 <Button type="button" variant="outline" onClick={() => router.push("/dashboard")}>
                   Cancel Sale
                 </Button>
