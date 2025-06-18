@@ -1,3 +1,4 @@
+
 import type { UserRole, JobOrderStatus, PaymentStatus, CommissionType } from '@/lib/constants';
 
 export interface User {
@@ -105,11 +106,12 @@ export interface JobOrder {
 }
 
 export interface Mechanic {
-  id: string; // Could be userId if mechanics are also users
+  id: string;
   name: string;
-  specializations?: string[]; // e.g., ['Engine', 'Electrical']
+  specializations?: string; // Changed from string[] for simpler form handling
   isActive: boolean;
-  // other mechanic-specific fields
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 export interface Payment {
