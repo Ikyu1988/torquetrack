@@ -19,10 +19,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { ShoppingCart, PlusCircle, Trash2, Printer, Eye, ClipboardList } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
-import type { JobOrder, Customer, Part, PaymentMethod, ShopSettings } from "@/types";
+import type { SalesOrder, Customer, Part, PaymentMethod, ShopSettings, Payment } from "@/types";
 import { useEffect, useState, useMemo } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { JOB_ORDER_STATUSES, PAYMENT_STATUSES, PAYMENT_METHOD_OPTIONS } from "@/lib/constants";
+import { SALES_ORDER_STATUSES, PAYMENT_STATUSES, PAYMENT_METHOD_OPTIONS } from "@/lib/constants";
 import { Separator } from "@/components/ui/separator";
 import Link from "next/link";
 import {
@@ -36,7 +36,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 
-const directSalePartItemSchema = z.object({
+const salesOrderItemSchema = z.object({
   id: z.string(), 
   partId: z.string().min(1, "Part selection is required."),
   partName: z.string(), 
@@ -45,23 +45,123 @@ const directSalePartItemSchema = z.object({
   totalPrice: z.coerce.number().min(0), 
 });
 
-const directSaleFormSchema = z.object({
+const salesOrderFormSchema = z.object({
   customerId: z.string().optional(), 
-  partsUsed: z.array(directSalePartItemSchema).min(1, { message: "At least one part must be added to the sale." }),
+  items: z.array(salesOrderItemSchema).min(1, { message: "At least one part must be added to the sale." }),
   discountAmount: z.coerce.number().min(0, "Discount must be non-negative.").optional().or(z.literal('')),
   paymentMethod: z.enum(PAYMENT_METHOD_OPTIONS),
   paymentNotes: z.string().max(250).optional().or(z.literal('')),
+  status: z.nativeEnum(SALES_ORDER_STATUSES).default(SALES_ORDER_STATUSES.COMPLETED),
 });
 
-type DirectSaleFormValues = z.infer<typeof directSaleFormSchema>;
+type SalesOrderFormValues = z.infer<typeof salesOrderFormSchema>;
 
 const WALK_IN_CUSTOMER_IDENTIFIER = "__walk_in_special_value__";
 
-type AddJobOrderInput = Omit<JobOrder, 'id' | 'createdAt' | 'updatedAt' | 'createdByUserId' | 'grandTotal' | 'amountPaid' | 'paymentHistory' | 'taxAmount'> & {
-  initialPaymentMethod?: PaymentMethod;
-  initialPaymentNotes?: string;
-  taxAmount?: number;
-};
+if (typeof window !== 'undefined') {
+  if (!(window as any).__salesOrderStore) {
+    (window as any).__salesOrderStore = {
+      salesOrders: [],
+      addSalesOrder: (orderData: Omit<SalesOrder, 'id' | 'createdAt' | 'updatedAt' | 'grandTotal' | 'amountPaid' | 'paymentHistory' | 'customerName'> & { initialPaymentMethod?: PaymentMethod; initialPaymentNotes?: string; taxAmount?: number }) => {
+        const customer = orderData.customerId && orderData.customerId !== WALK_IN_CUSTOMER_IDENTIFIER && (window as any).__customerStore ? (window as any).__customerStore.getCustomerById(orderData.customerId) : null;
+        const totalItems = orderData.items.reduce((sum, item) => sum + item.totalPrice, 0);
+        const discount = Number(orderData.discountAmount) || 0;
+        
+        let taxRateValue = 0;
+        if(typeof window !== 'undefined' && (window as any).__settingsStore) {
+            taxRateValue = (window as any).__settingsStore.getSettings()?.defaultTaxRate || 0;
+        }
+        const subTotalBeforeTax = totalItems - discount;
+        const calculatedTaxAmount = orderData.taxAmount !== undefined ? Number(orderData.taxAmount) : (subTotalBeforeTax * (taxRateValue / 100));
+        const grandTotal = subTotalBeforeTax + calculatedTaxAmount;
+
+        const newSalesOrder: SalesOrder = {
+          ...orderData,
+          id: String(Date.now() + Math.random()),
+          customerName: customer ? `${customer.firstName} ${customer.lastName}` : "Walk-in Customer",
+          items: orderData.items.map(item => ({ ...item })),
+          taxAmount: calculatedTaxAmount,
+          grandTotal,
+          amountPaid: orderData.paymentStatus === PAYMENT_STATUSES.PAID ? grandTotal : 0,
+          paymentHistory: [],
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          createdByUserId: "current_user_placeholder",
+        };
+
+        if (newSalesOrder.paymentStatus === PAYMENT_STATUSES.PAID && newSalesOrder.amountPaid > 0) {
+            const initialPayment: Payment = {
+                id: String(Date.now() + 1), 
+                orderId: newSalesOrder.id,
+                orderType: 'SalesOrder',
+                amount: newSalesOrder.amountPaid,
+                paymentDate: new Date(),
+                method: orderData.initialPaymentMethod || 'Cash', 
+                notes: orderData.initialPaymentNotes || `Payment for sale #${newSalesOrder.id.substring(0,6)}`,
+                processedByUserId: newSalesOrder.createdByUserId,
+                createdAt: new Date(),
+            };
+            newSalesOrder.paymentHistory.push(initialPayment);
+            if(typeof window !== 'undefined' && (window as any).__paymentStore) {
+                (window as any).__paymentStore.addPayment(initialPayment);
+            }
+        }
+
+        (window as any).__salesOrderStore.salesOrders.push(newSalesOrder);
+
+        if ((window as any).__inventoryStore) {
+          newSalesOrder.items.forEach(item => {
+            const part = (window as any).__inventoryStore.getPartById(item.partId);
+            if (part) {
+              part.stockQuantity -= item.quantity;
+              (window as any).__inventoryStore.updatePart(part);
+            }
+          });
+        }
+        return newSalesOrder;
+      },
+      getSalesOrderById: (orderId: string) => {
+         const order = (window as any).__salesOrderStore.salesOrders.find((so: SalesOrder) => so.id === orderId);
+         if (order && (window as any).__paymentStore) {
+            const payments = (window as any).__paymentStore.getPaymentsByOrderId(order.id, 'SalesOrder');
+            order.paymentHistory = payments;
+            order.amountPaid = payments.reduce((sum: number, p: Payment) => sum + p.amount, 0);
+            if (order.amountPaid >= order.grandTotal && order.grandTotal > 0.001) order.paymentStatus = PAYMENT_STATUSES.PAID;
+            else if (order.grandTotal <= 0.001 && order.amountPaid <= 0.001) order.paymentStatus = PAYMENT_STATUSES.PAID;
+            else if (order.amountPaid > 0) order.paymentStatus = PAYMENT_STATUSES.PARTIAL;
+            else order.paymentStatus = PAYMENT_STATUSES.UNPAID;
+         }
+         return order;
+      },
+      addPaymentToSalesOrder: (orderId: string, payment: Payment) => {
+        const orderIndex = (window as any).__salesOrderStore.salesOrders.findIndex((so: SalesOrder) => so.id === orderId);
+        if (orderIndex !== -1) {
+            const order = (window as any).__salesOrderStore.salesOrders[orderIndex];
+            if (!order.paymentHistory.find(p => p.id === payment.id)) {
+                order.paymentHistory.push(payment);
+                order.amountPaid += payment.amount;
+            } else {
+                 order.amountPaid = order.paymentHistory.reduce((sum: number, p: Payment) => sum + p.amount, 0);
+            }
+
+            const grandTotalNum = Number(order.grandTotal) || 0;
+            if (order.amountPaid >= grandTotalNum - 0.001 && grandTotalNum > 0.001) {
+                order.paymentStatus = PAYMENT_STATUSES.PAID;
+            } else if (grandTotalNum <= 0.001 && order.amountPaid <= 0.001) {
+                order.paymentStatus = PAYMENT_STATUSES.PAID;
+            } else if (order.amountPaid > 0) {
+                order.paymentStatus = PAYMENT_STATUSES.PARTIAL;
+            } else {
+                order.paymentStatus = PAYMENT_STATUSES.UNPAID;
+            }
+            order.updatedAt = new Date();
+            return true;
+        }
+        return false;
+      }
+    };
+  }
+}
 
 
 export default function DirectSalesPage() {
@@ -71,38 +171,33 @@ export default function DirectSalesPage() {
   const [availableParts, setAvailableParts] = useState<Part[]>([]);
   const [shopSettings, setShopSettings] = useState<ShopSettings | null>(null);
   const [isMounted, setIsMounted] = useState(false);
-  const [completedSales, setCompletedSales] = useState<JobOrder[]>([]);
+  const [completedSales, setCompletedSales] = useState<SalesOrder[]>([]);
 
   const currency = useMemo(() => shopSettings?.currencySymbol || '₱', [shopSettings]);
 
-  const customerMap = useMemo(() => {
-    const map = new Map<string, string>();
-    customers.forEach(c => map.set(c.id, `${c.firstName} ${c.lastName}`));
-    return map;
-  }, [customers]);
-
-  const form = useForm<DirectSaleFormValues>({
-    resolver: zodResolver(directSaleFormSchema),
+  const form = useForm<SalesOrderFormValues>({
+    resolver: zodResolver(salesOrderFormSchema),
     defaultValues: {
       customerId: undefined,
-      partsUsed: [],
+      items: [],
       discountAmount: undefined,
       paymentMethod: "Cash",
       paymentNotes: "",
+      status: SALES_ORDER_STATUSES.COMPLETED,
     },
   });
 
-  const { fields: partFields, append: appendPart, remove: removePart } = useFieldArray({
+  const { fields: itemFields, append: appendItem, remove: removeItem } = useFieldArray({
     control: form.control,
-    name: "partsUsed",
+    name: "items",
   });
 
-  const partsUsedWatch = form.watch("partsUsed");
+  const itemsWatch = form.watch("items");
   const discountAmountWatch = form.watch("discountAmount") || 0;
 
   const subTotalParts = useMemo(() => {
-    return partsUsedWatch.reduce((sum, item) => sum + (Number(item.totalPrice) || 0), 0);
-  }, [partsUsedWatch]);
+    return itemsWatch.reduce((sum, item) => sum + (Number(item.totalPrice) || 0), 0);
+  }, [itemsWatch]);
 
   const calculatedTaxAmountForDisplay = useMemo(() => {
     if (!shopSettings || shopSettings.defaultTaxRate === undefined || shopSettings.defaultTaxRate <= 0) return 0;
@@ -120,9 +215,8 @@ export default function DirectSalesPage() {
       if ((window as any).__customerStore) setCustomers((window as any).__customerStore.customers);
       if ((window as any).__inventoryStore) setAvailableParts((window as any).__inventoryStore.parts.filter((p: Part) => p.isActive && p.stockQuantity > 0));
       if ((window as any).__settingsStore) setShopSettings((window as any).__settingsStore.getSettings());
-      if ((window as any).__jobOrderStore) {
-        const allJobOrders: JobOrder[] = (window as any).__jobOrderStore.jobOrders || [];
-        const sales = allJobOrders.map(jo => (window as any).__jobOrderStore.getJobOrderById ? (window as any).__jobOrderStore.getJobOrderById(jo.id) : jo).filter(Boolean).filter(jo => jo.status === JOB_ORDER_STATUSES.SALE_COMPLETED);
+      if ((window as any).__salesOrderStore) {
+        const sales = ((window as any).__salesOrderStore.salesOrders || []).map((so: SalesOrder) => (window as any).__salesOrderStore.getSalesOrderById(so.id)).filter(Boolean);
         setCompletedSales(sales);
       }
     }
@@ -135,37 +229,35 @@ export default function DirectSalesPage() {
 
   useEffect(() => {
     if (!isMounted) return;
-    const interval = setInterval(fetchAndSetData, 2000); // Refresh data periodically
+    const interval = setInterval(fetchAndSetData, 1500); 
     return () => clearInterval(interval);
   }, [isMounted]);
 
 
-  function onSubmit(data: DirectSaleFormValues) {
-    let newSaleOrder: JobOrder | null = null;
-    if (typeof window !== 'undefined' && (window as any).__jobOrderStore && typeof (window as any).__jobOrderStore.addJobOrder === 'function') {
-        const saleOrderData: AddJobOrderInput = {
+  function onSubmit(data: SalesOrderFormValues) {
+    let newSaleOrder: SalesOrder | null = null;
+    if (typeof window !== 'undefined' && (window as any).__salesOrderStore && typeof (window as any).__salesOrderStore.addSalesOrder === 'function') {
+        const saleOrderData: Omit<SalesOrder, 'id' | 'createdAt' | 'updatedAt' | 'grandTotal' | 'amountPaid' | 'paymentHistory' | 'customerName'> & { initialPaymentMethod?: PaymentMethod; initialPaymentNotes?: string; taxAmount?: number } = {
             customerId: data.customerId === WALK_IN_CUSTOMER_IDENTIFIER ? undefined : data.customerId,
-            motorcycleId: undefined, 
-            status: JOB_ORDER_STATUSES.SALE_COMPLETED,
-            servicesPerformed: [], 
-            partsUsed: data.partsUsed.map(p => ({...p})), 
-            diagnostics: "Direct Parts Sale",
+            status: data.status,
+            items: data.items.map(p => ({...p})), 
             discountAmount: data.discountAmount === '' ? undefined : Number(data.discountAmount),
-            paymentStatus: PAYMENT_STATUSES.PAID, 
+            paymentStatus: PAYMENT_STATUSES.PAID, // Direct sales are typically paid immediately
             initialPaymentMethod: data.paymentMethod, 
             initialPaymentNotes: data.paymentNotes || `Payment for direct sale`,
             taxAmount: calculatedTaxAmountForDisplay,
+            notes: "Direct Parts Sale",
         };
       
       try {
-        newSaleOrder = (window as any).__jobOrderStore.addJobOrder(saleOrderData);
+        newSaleOrder = (window as any).__salesOrderStore.addSalesOrder(saleOrderData);
 
-        if (newSaleOrder && typeof newSaleOrder.id === 'string') { // Added check for valid newSaleOrder
+        if (newSaleOrder && typeof newSaleOrder.id === 'string') {
           toast({
             title: "Sale Completed",
             description: `Direct sale #${newSaleOrder.id.substring(0,6)} processed successfully. Grand Total: ${currency}${newSaleOrder.grandTotal.toFixed(2)}`,
           });
-          form.reset({ customerId: undefined, partsUsed: [], discountAmount: undefined, paymentMethod: "Cash", paymentNotes: "" });
+          form.reset({ customerId: undefined, items: [], discountAmount: undefined, paymentMethod: "Cash", paymentNotes: "", status: SALES_ORDER_STATUSES.COMPLETED });
           fetchAndSetData(); // Refresh lists after sale
         } else {
            toast({
@@ -173,7 +265,7 @@ export default function DirectSalesPage() {
             description: "Sale processing returned an unexpected result. Please check console for details.",
             variant: "destructive",
           });
-          console.error("newSaleOrder was not a valid JobOrder object:", newSaleOrder);
+          console.error("newSaleOrder was not a valid SalesOrder object:", newSaleOrder);
         }
       } catch (e: any) {
         console.error("Error during sale processing:", e);
@@ -186,7 +278,7 @@ export default function DirectSalesPage() {
     } else {
        toast({
         title: "Store Not Ready",
-        description: "Cannot process sale. The job order system is not available or not fully loaded. Please try reloading or wait a moment.",
+        description: "Cannot process sale. The sales order system is not available or not fully loaded. Please try reloading or wait a moment.",
         variant: "destructive",
       });
     }
@@ -202,9 +294,9 @@ export default function DirectSalesPage() {
         <CardHeader>
           <div className="flex items-center gap-3">
             <ShoppingCart className="h-6 w-6 text-primary" />
-            <CardTitle className="font-headline text-2xl">Direct Parts Sale</CardTitle>
+            <CardTitle className="font-headline text-2xl">Direct Parts Sale (New Sales Order)</CardTitle>
           </div>
-          <CardDescription>Create a new sale for parts purchased by a walk-in customer.</CardDescription>
+          <CardDescription>Create a new sales order for parts purchased directly.</CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...form}>
@@ -242,16 +334,16 @@ export default function DirectSalesPage() {
               <div className="space-y-4">
                 <div className="flex justify-between items-center">
                   <h3 className="text-lg font-medium">Parts to Sell</h3>
-                  <Button type="button" variant="outline" size="sm" onClick={() => appendPart({ id: Date.now().toString(), partId: "", partName: "", quantity: 1, pricePerUnit: 0, totalPrice: 0 })} className="print:hidden">
+                  <Button type="button" variant="outline" size="sm" onClick={() => appendItem({ id: Date.now().toString(), partId: "", partName: "", quantity: 1, pricePerUnit: 0, totalPrice: 0 })} className="print:hidden">
                     <PlusCircle className="mr-2 h-4 w-4" /> Add Part
                   </Button>
                 </div>
-                {partFields.map((item, index) => (
+                {itemFields.map((item, index) => (
                   <Card key={item.id} className="p-4 space-y-4 bg-muted/30">
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
                        <FormField
                         control={form.control}
-                        name={`partsUsed.${index}.partId`}
+                        name={`items.${index}.partId`}
                         render={({ field }) => (
                           <FormItem className="md:col-span-2">
                             <FormLabel>Part</FormLabel>
@@ -259,10 +351,10 @@ export default function DirectSalesPage() {
                               onValueChange={(value) => {
                                 field.onChange(value);
                                 const selectedPart = availableParts.find(p => p.id === value);
-                                form.setValue(`partsUsed.${index}.partName`, selectedPart?.name || "");
-                                form.setValue(`partsUsed.${index}.pricePerUnit`, selectedPart?.price || 0);
-                                const qty = form.getValues(`partsUsed.${index}.quantity`) || 1;
-                                form.setValue(`partsUsed.${index}.totalPrice`, (selectedPart?.price || 0) * qty);
+                                form.setValue(`items.${index}.partName`, selectedPart?.name || "");
+                                form.setValue(`items.${index}.pricePerUnit`, selectedPart?.price || 0);
+                                const qty = form.getValues(`items.${index}.quantity`) || 1;
+                                form.setValue(`items.${index}.totalPrice`, (selectedPart?.price || 0) * qty);
                               }} 
                               value={field.value}
                             >
@@ -280,7 +372,7 @@ export default function DirectSalesPage() {
                       />
                       <FormField
                         control={form.control}
-                        name={`partsUsed.${index}.quantity`}
+                        name={`items.${index}.quantity`}
                         render={({ field }) => (
                           <FormItem>
                             <FormLabel>Quantity</FormLabel>
@@ -292,8 +384,8 @@ export default function DirectSalesPage() {
                                 onChange={e => {
                                   const qty = parseInt(e.target.value, 10) || 0;
                                   field.onChange(qty);
-                                  const pricePerUnit = form.getValues(`partsUsed.${index}.pricePerUnit`) || 0;
-                                  form.setValue(`partsUsed.${index}.totalPrice`, pricePerUnit * qty);
+                                  const pricePerUnit = form.getValues(`items.${index}.pricePerUnit`) || 0;
+                                  form.setValue(`items.${index}.totalPrice`, pricePerUnit * qty);
                                 }}
                               />
                             </FormControl>
@@ -307,34 +399,34 @@ export default function DirectSalesPage() {
                             <span className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground">{currency}</span>
                             <Input 
                               type="number" 
-                              value={form.getValues(`partsUsed.${index}.totalPrice`).toFixed(2)} 
+                              value={form.getValues(`items.${index}.totalPrice`)?.toFixed(2) || "0.00"}
                               readOnly 
                               className="pl-7 bg-background" 
                             />
                           </div>
                         </FormItem>
                     </div>
-                    <Button type="button" variant="ghost" size="sm" onClick={() => removePart(index)} className="text-destructive hover:text-destructive/90 print:hidden">
+                    <Button type="button" variant="ghost" size="sm" onClick={() => removeItem(index)} className="text-destructive hover:text-destructive/90 print:hidden">
                        <Trash2 className="mr-2 h-4 w-4" /> Remove Part
                     </Button>
                   </Card>
                 ))}
-                {form.formState.errors.partsUsed && !form.formState.errors.partsUsed.root && partFields.length > 0 && (
+                {form.formState.errors.items && !form.formState.errors.items.root && itemFields.length > 0 && (
                     <p className="text-sm font-medium text-destructive">
-                        {form.formState.errors.partsUsed.message}
+                        {form.formState.errors.items.message}
                     </p>
                 )}
-                {partFields.length === 0 && (
+                {itemFields.length === 0 && (
                     <>
                         <p className="text-sm text-muted-foreground p-4 text-center">No parts added to the sale yet.</p>
-                        {form.formState.errors.partsUsed?.root && (
+                        {form.formState.errors.items?.root && (
                              <p className="text-sm font-medium text-destructive text-center">
-                                {form.formState.errors.partsUsed.root.message}
+                                {form.formState.errors.items.root.message}
                             </p>
                         )}
-                         {form.formState.errors.partsUsed && typeof form.formState.errors.partsUsed === 'string' && (
+                         {form.formState.errors.items && typeof form.formState.errors.items === 'string' && (
                             <p className="text-sm font-medium text-destructive text-center">
-                                {form.formState.errors.partsUsed}
+                                {form.formState.errors.items}
                             </p>
                         )}
                     </>
@@ -431,7 +523,7 @@ export default function DirectSalesPage() {
                 <Button type="button" variant="outline" onClick={() => router.push("/dashboard")}>
                   Cancel Sale
                 </Button>
-                <Button type="submit" disabled={form.formState.isSubmitting || grandTotal < 0 || partFields.length === 0} size="lg">
+                <Button type="submit" disabled={form.formState.isSubmitting || grandTotal < 0 || itemFields.length === 0} size="lg">
                   {form.formState.isSubmitting ? "Processing..." : `Complete Sale (${currency}${grandTotal.toFixed(2)})`}
                 </Button>
               </div>
@@ -446,7 +538,7 @@ export default function DirectSalesPage() {
         <CardHeader>
             <div className="flex items-center gap-3">
                 <ClipboardList className="h-6 w-6 text-primary" />
-                <CardTitle className="font-headline text-2xl">Completed Direct Sales</CardTitle>
+                <CardTitle className="font-headline text-2xl">Completed Sales Orders</CardTitle>
             </div>
             <CardDescription>A list of your recent direct part sales.</CardDescription>
         </CardHeader>
@@ -458,6 +550,8 @@ export default function DirectSalesPage() {
                   <TableHead>Sale ID</TableHead>
                   <TableHead>Customer</TableHead>
                   <TableHead>Date</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Payment</TableHead>
                   <TableHead className="text-right">Total Amount</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
@@ -466,12 +560,14 @@ export default function DirectSalesPage() {
                 {completedSales.map((sale) => (
                   <TableRow key={sale.id}>
                     <TableCell className="font-medium">{`#${sale.id.substring(0,6)}`}</TableCell>
-                    <TableCell>{sale.customerId ? customerMap.get(sale.customerId) || "N/A" : "Walk-in Customer"}</TableCell>
+                    <TableCell>{sale.customerName || "Walk-in Customer"}</TableCell>
                     <TableCell>{format(new Date(sale.createdAt), "MMM dd, yyyy")}</TableCell>
+                    <TableCell><Badge variant={sale.status === SALES_ORDER_STATUSES.COMPLETED ? "default" : "secondary"}>{sale.status}</Badge></TableCell>
+                    <TableCell><Badge variant={sale.paymentStatus === PAYMENT_STATUSES.PAID ? "default" : (sale.paymentStatus === PAYMENT_STATUSES.UNPAID ? "destructive" : "secondary") }>{sale.paymentStatus}</Badge></TableCell>
                     <TableCell className="text-right">{currency}{(sale.grandTotal || 0).toFixed(2)}</TableCell>
                     <TableCell className="text-right">
                       <Button variant="ghost" size="icon" asChild className="hover:text-primary">
-                        <Link href={`/dashboard/job-orders/${sale.id}`}>
+                        <Link href={`/dashboard/sales-orders/${sale.id}`}>
                           <Eye className="h-4 w-4" />
                           <span className="sr-only">View Sale Details</span>
                         </Link>
@@ -484,7 +580,7 @@ export default function DirectSalesPage() {
           ) : (
             <div className="flex flex-col items-center justify-center gap-4 py-10 text-muted-foreground">
                 <ShoppingCart className="h-16 w-16" />
-                <p className="text-lg">No completed direct sales found yet.</p>
+                <p className="text-lg">No completed sales orders found yet.</p>
                 <p>Create a new sale using the form above.</p>
             </div>
           )}
@@ -494,3 +590,4 @@ export default function DirectSalesPage() {
     </div>
   );
 }
+

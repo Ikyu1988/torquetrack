@@ -1,5 +1,6 @@
 
-import type { UserRole, JobOrderStatus, PaymentStatus, CommissionType, PaymentMethod, PurchaseRequisitionStatus, PurchaseOrderStatus, GoodsReceiptStatus } from '@/lib/constants';
+
+import type { UserRole, JobOrderStatus, PaymentStatus, CommissionType, PaymentMethod, PurchaseRequisitionStatus, PurchaseOrderStatus, GoodsReceiptStatus, SalesOrderStatus } from '@/lib/constants';
 
 export interface User {
   id: string;
@@ -88,7 +89,8 @@ export interface JobOrderPartItem {
 
 export interface Payment {
   id: string;
-  jobOrderId: string; // Links payment to a JobOrder or a Direct Sale (which might be stored as a JobOrder)
+  orderId: string; // Links payment to a JobOrder OR SalesOrder
+  orderType: 'JobOrder' | 'SalesOrder';
   amount: number;
   paymentDate: Date;
   method: PaymentMethod;
@@ -99,33 +101,61 @@ export interface Payment {
 
 export interface JobOrder {
   id: string;
-  customerId?: string; // Optional for direct/walk-in sales
-  motorcycleId?: string; // Optional for direct/walk-in sales
+  customerId: string; 
+  motorcycleId: string; 
   status: JobOrderStatus;
   
   servicesPerformed: JobOrderServiceItem[]; 
   partsUsed: JobOrderPartItem[];          
 
-  servicesDescription?: string; // Overall notes for services, can be empty if using line items
-  partsDescription?: string;    // Overall notes for parts, can be empty if using line items
+  servicesDescription?: string; 
+  partsDescription?: string;    
 
-  diagnostics?: string; // Relevant for service jobs
+  diagnostics?: string; 
   images?: string[]; 
-  estimatedCompletionDate?: Date; // Relevant for service jobs
+  estimatedCompletionDate?: Date; 
   actualCompletionDate?: Date;
   
   discountAmount?: number;
-  taxAmount?: number; // This could be calculated based on shop settings
+  taxAmount?: number; 
   grandTotal: number;
   
   paymentStatus: PaymentStatus;
-  amountPaid: number; // Total amount paid for this job order/sale
-  paymentHistory: Payment[]; // Array of payment transactions
+  amountPaid: number; 
+  paymentHistory: Payment[]; 
 
   createdAt: Date;
   updatedAt: Date;
   createdByUserId: string; 
 }
+
+export interface SalesOrderItem {
+  id: string;
+  partId: string;
+  partName: string;
+  quantity: number;
+  pricePerUnit: number;
+  totalPrice: number;
+}
+
+export interface SalesOrder {
+  id: string;
+  customerId?: string; // Optional for walk-in
+  customerName?: string; // Denormalized if customerId is present
+  status: SalesOrderStatus;
+  items: SalesOrderItem[];
+  discountAmount?: number;
+  taxAmount?: number;
+  grandTotal: number;
+  paymentStatus: PaymentStatus;
+  amountPaid: number;
+  paymentHistory: Payment[];
+  notes?: string;
+  createdAt: Date;
+  updatedAt: Date;
+  createdByUserId: string;
+}
+
 
 export interface Mechanic {
   id: string;
@@ -212,6 +242,7 @@ export interface PurchaseOrder {
   id: string;
   purchaseRequisitionId?: string; // Optional: if generated from a requisition
   supplierId: string;
+  supplierName?: string; // Denormalized
   orderDate: Date;
   expectedDeliveryDate?: Date;
   items: PurchaseOrderItem[];

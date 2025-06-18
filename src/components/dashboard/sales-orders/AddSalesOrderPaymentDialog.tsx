@@ -26,13 +26,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DatePicker } from "@/components/ui/date-picker";
 import { PAYMENT_METHOD_OPTIONS } from "@/lib/constants";
-import type { JobOrder, Payment, PaymentMethod } from "@/types";
+import type { SalesOrder, Payment, PaymentMethod } from "@/types";
 import React from "react";
 
-interface AddPaymentDialogProps {
+interface AddSalesOrderPaymentDialogProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
-  jobOrder: JobOrder;
+  salesOrder: SalesOrder;
   onPaymentAdded: () => void;
   currencySymbol?: string;
 }
@@ -46,8 +46,8 @@ const paymentFormSchema = z.object({
 
 type PaymentFormValues = z.infer<typeof paymentFormSchema>;
 
-export function AddPaymentDialog({ isOpen, onOpenChange, jobOrder, onPaymentAdded, currencySymbol = "₱" }: AddPaymentDialogProps) {
-  const balanceDue = jobOrder.grandTotal - jobOrder.amountPaid;
+export function AddSalesOrderPaymentDialog({ isOpen, onOpenChange, salesOrder, onPaymentAdded, currencySymbol = "₱" }: AddSalesOrderPaymentDialogProps) {
+  const balanceDue = salesOrder.grandTotal - salesOrder.amountPaid;
 
   const form = useForm<PaymentFormValues>({
     resolver: zodResolver(paymentFormSchema),
@@ -72,10 +72,10 @@ export function AddPaymentDialog({ isOpen, onOpenChange, jobOrder, onPaymentAdde
 
 
   function onSubmit(data: PaymentFormValues) {
-    if (typeof window !== 'undefined' && (window as any).__jobOrderStore && (window as any).__paymentStore) {
+    if (typeof window !== 'undefined' && (window as any).__salesOrderStore && (window as any).__paymentStore) {
         const newPaymentData: Omit<Payment, 'id' | 'createdAt'> = {
-            orderId: jobOrder.id,
-            orderType: 'JobOrder',
+            orderId: salesOrder.id,
+            orderType: 'SalesOrder',
             amount: data.amount,
             paymentDate: data.paymentDate,
             method: data.method,
@@ -84,7 +84,7 @@ export function AddPaymentDialog({ isOpen, onOpenChange, jobOrder, onPaymentAdde
         };
         
         const savedPayment = (window as any).__paymentStore.addPayment(newPaymentData);
-        (window as any).__jobOrderStore.addPaymentToJobOrder(jobOrder.id, savedPayment);
+        (window as any).__salesOrderStore.addPaymentToSalesOrder(salesOrder.id, savedPayment);
         
         onPaymentAdded();
         onOpenChange(false);
@@ -97,7 +97,7 @@ export function AddPaymentDialog({ isOpen, onOpenChange, jobOrder, onPaymentAdde
     }}>
       <DialogContent className="sm:max-w-[480px]">
         <DialogHeader>
-          <DialogTitle>Add Payment for Job Order #{jobOrder.id.substring(0,6)}</DialogTitle>
+          <DialogTitle>Add Payment for Sales Order #{salesOrder.id.substring(0,6)}</DialogTitle>
           <DialogDescription>
             Balance Due: {currencySymbol}{balanceDue.toFixed(2)}
           </DialogDescription>
@@ -164,7 +164,7 @@ export function AddPaymentDialog({ isOpen, onOpenChange, jobOrder, onPaymentAdde
                 <FormItem>
                   <FormLabel>Notes (Optional)</FormLabel>
                   <FormControl>
-                    <Textarea placeholder="e.g., Paid by customer's brother" {...field} rows={3} />
+                    <Textarea placeholder="e.g., Paid by customer's representative" {...field} rows={3} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

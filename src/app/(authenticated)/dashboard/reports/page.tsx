@@ -4,14 +4,14 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { FileText, BarChart2, DollarSign, Download, Filter, Search, AlertTriangle } from "lucide-react";
+import { FileText, BarChart2, DollarSign, Download, Filter, Search, AlertTriangle, ShoppingBag } from "lucide-react";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
-import type { JobOrder, Customer, Mechanic, Part, Service, Payment, ShopSettings, JobOrderServiceItem, CommissionType, JobOrderStatus } from "@/types";
-import { JOB_ORDER_STATUS_OPTIONS, JOB_ORDER_STATUSES, COMMISSION_TYPES } from "@/lib/constants";
+import type { JobOrder, Customer, Mechanic, Part, Service, Payment, ShopSettings, JobOrderServiceItem, CommissionType, JobOrderStatus, SalesOrder, SalesOrderStatus } from "@/types";
+import { JOB_ORDER_STATUS_OPTIONS, SALES_ORDER_STATUS_OPTIONS, COMMISSION_TYPES, PAYMENT_STATUSES } from "@/lib/constants";
 import { format, startOfMonth } from "date-fns";
 
 const convertToCSV = (data: any[], headers?: string[]): string => {
@@ -54,10 +54,17 @@ export default function ReportsPage() {
 
   const [startDate, setStartDate] = useState<Date | undefined>(startOfMonth(new Date()));
   const [endDate, setEndDate] = useState<Date | undefined>(new Date());
-  const [selectedStatus, setSelectedStatus] = useState<JobOrderStatus | "ALL">("ALL");
+  
+  // Job Order Filters
+  const [selectedJobOrderStatus, setSelectedJobOrderStatus] = useState<JobOrderStatus | "ALL">("ALL");
   const [selectedMechanicId, setSelectedMechanicId] = useState<string | "ALL">("ALL");
   
+  // Sales Order Filters
+  const [selectedSalesOrderStatus, setSelectedSalesOrderStatus] = useState<SalesOrderStatus | "ALL">("ALL");
+
+
   const [allJobOrders, setAllJobOrders] = useState<JobOrder[]>([]);
+  const [allSalesOrders, setAllSalesOrders] = useState<SalesOrder[]>([]);
   const [allMechanics, setAllMechanics] = useState<Mechanic[]>([]);
   const [allCustomers, setAllCustomers] = useState<Customer[]>([]);
   const [allServices, setAllServices] = useState<Service[]>([]);
@@ -66,6 +73,7 @@ export default function ReportsPage() {
   const [shopSettings, setShopSettings] = useState<ShopSettings | null>(null);
 
   const [jobOrderSummary, setJobOrderSummary] = useState<any[]>([]);
+  const [salesOrderReport, setSalesOrderReport] = useState<any[]>([]);
   const [commissionReport, setCommissionReport] = useState<any[]>([]);
   const [partsUsageReport, setPartsUsageReport] = useState<any[]>([]);
   const [serviceSalesReport, setServiceSalesReport] = useState<any[]>([]);
@@ -84,6 +92,7 @@ export default function ReportsPage() {
     setIsMounted(true);
     if (typeof window !== 'undefined') {
       if ((window as any).__jobOrderStore) setAllJobOrders((window as any).__jobOrderStore.jobOrders || []);
+      if ((window as any).__salesOrderStore) setAllSalesOrders((window as any).__salesOrderStore.salesOrders || []);
       if ((window as any).__mechanicStore) setAllMechanics((window as any).__mechanicStore.mechanics || []);
       if ((window as any).__customerStore) setAllCustomers((window as any).__customerStore.customers || []);
       if ((window as any).__serviceStore) setAllServices((window as any).__serviceStore.services || []);
@@ -123,7 +132,7 @@ export default function ReportsPage() {
           if (!startDate || !endDate) return true; 
           const joDate = new Date(jo.createdAt);
           const inDateRange = joDate >= startDate && joDate <= endDate;
-          const statusMatch = selectedStatus === "ALL" || jo.status === selectedStatus;
+          const statusMatch = selectedJobOrderStatus === "ALL" || jo.status === selectedJobOrderStatus;
           
           let mechanicMatch = selectedMechanicId === "ALL";
           if (selectedMechanicId !== "ALL") {
@@ -133,12 +142,20 @@ export default function ReportsPage() {
           return inDateRange && statusMatch && mechanicMatch;
         });
 
+        const filteredSalesOrders = allSalesOrders.filter(so => {
+            if (!startDate || !endDate) return true;
+            const soDate = new Date(so.createdAt);
+            const inDateRange = soDate >= startDate && soDate <= endDate;
+            const statusMatch = selectedSalesOrderStatus === "ALL" || so.status === selectedSalesOrderStatus;
+            return inDateRange && statusMatch;
+        });
+
         switch (reportType) {
           case "jobOrderSummary":
             const summary = filteredJobOrders.map(jo => ({
               ID: jo.id.substring(0,6),
-              Customer: jo.customerId ? customerMap.get(jo.customerId) || "N/A" : "Walk-in",
-              Motorcycle: jo.motorcycleId && (window as any).__motorcycleStore?.getMotorcycleById(jo.motorcycleId)?.model || (jo.status === JOB_ORDER_STATUSES.SALE_COMPLETED ? "Direct Sale Item" : "N/A"),
+              Customer: jo.customerId ? customerMap.get(jo.customerId) || "N/A" : "N/A",
+              Motorcycle: jo.motorcycleId && (window as any).__motorcycleStore?.getMotorcycleById(jo.motorcycleId)?.model || "N/A",
               Mechanic: jo.servicesPerformed?.map(s => s.assignedMechanicId ? mechanicMap.get(s.assignedMechanicId) : '').filter(Boolean).join(', ') || 'N/A',
               Status: jo.status,
               Date: format(new Date(jo.createdAt), "yyyy-MM-dd"),
@@ -146,15 +163,23 @@ export default function ReportsPage() {
             }));
             setJobOrderSummary(summary);
             break;
+
+          case "salesOrderReport":
+            const salesReportData = filteredSalesOrders.map(so => ({
+                ID: so.id.substring(0,6),
+                Customer: so.customerName || "Walk-in",
+                Status: so.status,
+                PaymentStatus: so.paymentStatus,
+                Date: format(new Date(so.createdAt), "yyyy-MM-dd"),
+                Items: so.items.length,
+                Total: `${currencySymbol}${so.grandTotal.toFixed(2)}`,
+            }));
+            setSalesOrderReport(salesReportData);
+            break;
           
           case "commissionReport":
             let commissions: any[] = [];
-            allJobOrders.filter(jo => { 
-                if (!startDate || !endDate) return false;
-                const joDate = new Date(jo.createdAt);
-                const mechanicFilterMatch = selectedMechanicId === "ALL" || jo.servicesPerformed?.some(s => s.assignedMechanicId === selectedMechanicId);
-                return joDate >= startDate && joDate <= endDate && mechanicFilterMatch;
-            }).forEach(jo => {
+            filteredJobOrders.forEach(jo => { // only from job orders
               jo.servicesPerformed?.forEach(serviceItem => {
                 if (selectedMechanicId !== "ALL" && serviceItem.assignedMechanicId !== selectedMechanicId) return;
 
@@ -184,12 +209,10 @@ export default function ReportsPage() {
 
           case "partsUsage":
             const partsUsage: Record<string, { name: string, sku?: string, quantity: number, totalValue: number }> = {};
-             allJobOrders.filter(jo => { 
-                if (!startDate || !endDate) return false;
-                const joDate = new Date(jo.createdAt);
-                return joDate >= startDate && joDate <= endDate;
-            }).forEach(jo => {
-                jo.partsUsed?.forEach(partItem => {
+            const combinedOrders: Array<{partsUsed?: Array<{partId:string, partName: string, quantity: number, totalPrice: number}>}> = [...filteredJobOrders, ...filteredSalesOrders.map(so => ({partsUsed: so.items}))];
+            
+            combinedOrders.forEach(order => {
+                order.partsUsed?.forEach(partItem => {
                     const partDetails = allParts.find(p => p.id === partItem.partId);
                     if (!partsUsage[partItem.partId]) {
                         partsUsage[partItem.partId] = { name: partItem.partName, sku: partDetails?.sku || '-', quantity: 0, totalValue: 0 };
@@ -201,13 +224,9 @@ export default function ReportsPage() {
             setPartsUsageReport(Object.values(partsUsage).map(p => ({ Name: p.name, SKU: p.sku, QuantityUsed: p.quantity, TotalValue: `${currencySymbol}${p.totalValue.toFixed(2)}` })));
             break;
 
-          case "serviceSales":
+          case "serviceSales": // Only from Job Orders
             const serviceSales: Record<string, { name: string, count: number, totalRevenue: number }> = {};
-             allJobOrders.filter(jo => { 
-                if (!startDate || !endDate) return false;
-                const joDate = new Date(jo.createdAt);
-                return joDate >= startDate && joDate <= endDate;
-            }).forEach(jo => {
+             filteredJobOrders.forEach(jo => {
                 jo.servicesPerformed?.forEach(serviceItem => {
                     if (!serviceSales[serviceItem.serviceId]) {
                         serviceSales[serviceItem.serviceId] = { name: serviceItem.serviceName, count: 0, totalRevenue: 0 };
@@ -252,16 +271,25 @@ export default function ReportsPage() {
                  setCustomerServiceHistory([]);
                  break;
             }
-            const history = allJobOrders
+            const jobOrderHistory = allJobOrders
                 .filter(jo => jo.customerId === selectedCustomerIdForHistory) 
                 .map(jo => ({
-                    JobOrderID: jo.id.substring(0,6),
+                    OrderID: `JO-${jo.id.substring(0,6)}`,
+                    Type: "Job Order",
                     Date: format(new Date(jo.createdAt), "yyyy-MM-dd"),
-                    Motorcycle: jo.motorcycleId && (window as any).__motorcycleStore?.getMotorcycleById(jo.motorcycleId)?.model || (jo.status === JOB_ORDER_STATUSES.SALE_COMPLETED ? "Direct Sale Item" : "N/A"),
-                    Services: jo.servicesPerformed?.map(s => s.serviceName).join(', ') || jo.diagnostics || "Parts Sale",
+                    Details: jo.servicesPerformed?.map(s => s.serviceName).join(', ') || jo.diagnostics || "N/A",
                     Total: `${currencySymbol}${jo.grandTotal.toFixed(2)}`,
                 }));
-            setCustomerServiceHistory(history);
+            const salesOrderHistory = allSalesOrders
+                .filter(so => so.customerId === selectedCustomerIdForHistory)
+                .map(so => ({
+                    OrderID: `SO-${so.id.substring(0,6)}`,
+                    Type: "Sales Order",
+                    Date: format(new Date(so.createdAt), "yyyy-MM-dd"),
+                    Details: so.items.map(i => `${i.partName} (x${i.quantity})`).join(', ') || "Parts Sale",
+                    Total: `${currencySymbol}${so.grandTotal.toFixed(2)}`,
+                }));
+            setCustomerServiceHistory([...jobOrderHistory, ...salesOrderHistory].sort((a,b) => new Date(b.Date).getTime() - new Date(a.Date).getTime()));
             break;
 
           case "lowStockItems":
@@ -358,7 +386,7 @@ export default function ReportsPage() {
           <CardDescription>Analyze your workshop's performance and gain valuable insights. Use global filters below for applicable reports.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 p-4 border rounded-lg bg-muted/30 items-end">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-4 border rounded-lg bg-muted/30 items-end">
             <div className="grid gap-1.5">
               <label className="text-sm font-medium">Start Date</label>
               <DatePicker value={startDate} onChange={setStartDate} placeholder="Select start date" />
@@ -366,26 +394,6 @@ export default function ReportsPage() {
             <div className="grid gap-1.5">
               <label className="text-sm font-medium">End Date</label>
               <DatePicker value={endDate} onChange={setEndDate} placeholder="Select end date" />
-            </div>
-            <div className="grid gap-1.5">
-              <label className="text-sm font-medium">Job Order Status</label>
-              <Select value={selectedStatus} onValueChange={(value) => setSelectedStatus(value as JobOrderStatus | "ALL")}>
-                <SelectTrigger><SelectValue placeholder="Filter by status" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ALL">All Statuses</SelectItem>
-                  {JOB_ORDER_STATUS_OPTIONS.map(status => <SelectItem key={status} value={status}>{status}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid gap-1.5">
-              <label className="text-sm font-medium">Mechanic</label>
-              <Select value={selectedMechanicId} onValueChange={setSelectedMechanicId}>
-                <SelectTrigger><SelectValue placeholder="Filter by mechanic" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ALL">All Mechanics</SelectItem>
-                  {allMechanics.map(mech => <SelectItem key={mech.id} value={mech.id}>{mech.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
             </div>
           </div>
         </CardContent>
@@ -396,29 +404,95 @@ export default function ReportsPage() {
             title="Job Order Summary" 
             description="Overview of job orders based on selected global filters (date, status, mechanic)."
             reportKey="jobOrderSummary"
+            icon={<ClipboardList className="h-5 w-5 text-primary" />}
             data={jobOrderSummary}
             columns={[
-                { key: 'ID', label: 'ID' }, { key: 'Customer', label: 'Customer' }, { key: 'Motorcycle', label: 'Motorcycle/Type' },
+                { key: 'ID', label: 'ID' }, { key: 'Customer', label: 'Customer' }, { key: 'Motorcycle', label: 'Motorcycle' },
                 { key: 'Mechanic', label: 'Mechanic(s)' }, { key: 'Status', label: 'Status' }, { key: 'Date', label: 'Date' }, { key: 'Total', label: 'Total' }
             ]}
-            onExport={() => handleExportCSV(jobOrderSummary, "Job Order Summary", ["ID", "Customer", "Motorcycle/Type", "Mechanic(s)", "Status", "Date", "Total"])}
+            customFilters={
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+                    <div className="grid gap-1.5">
+                        <label className="text-sm font-medium">Job Order Status</label>
+                        <Select value={selectedJobOrderStatus} onValueChange={(value) => setSelectedJobOrderStatus(value as JobOrderStatus | "ALL")}>
+                            <SelectTrigger><SelectValue placeholder="Filter by status" /></SelectTrigger>
+                            <SelectContent>
+                            <SelectItem value="ALL">All Statuses</SelectItem>
+                            {JOB_ORDER_STATUS_OPTIONS.map(status => <SelectItem key={status} value={status}>{status}</SelectItem>)}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <div className="grid gap-1.5">
+                        <label className="text-sm font-medium">Mechanic</label>
+                        <Select value={selectedMechanicId} onValueChange={setSelectedMechanicId}>
+                            <SelectTrigger><SelectValue placeholder="Filter by mechanic" /></SelectTrigger>
+                            <SelectContent>
+                            <SelectItem value="ALL">All Mechanics</SelectItem>
+                            {allMechanics.map(mech => <SelectItem key={mech.id} value={mech.id}>{mech.name}</SelectItem>)}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                </div>
+            }
+            onExport={() => handleExportCSV(jobOrderSummary, "Job Order Summary", ["ID", "Customer", "Motorcycle", "Mechanic(s)", "Status", "Date", "Total"])}
+        />
+        
+        <ReportCard 
+            title="Sales Order Report" 
+            description="Overview of direct sales orders based on selected global filters (date, status)."
+            reportKey="salesOrderReport"
+            icon={<ShoppingBag className="h-5 w-5 text-primary" />}
+            data={salesOrderReport}
+            columns={[
+                { key: 'ID', label: 'ID' }, { key: 'Customer', label: 'Customer' }, { key: 'Status', label: 'Status' }, {key: 'PaymentStatus', label: 'Payment'},
+                { key: 'Date', label: 'Date' }, {key: 'Items', label: '# Items'}, { key: 'Total', label: 'Total' }
+            ]}
+            customFilters={
+                 <div className="grid grid-cols-1 sm:grid-cols-1 gap-4 mb-4"> {/* Only one filter for SO */}
+                    <div className="grid gap-1.5">
+                        <label className="text-sm font-medium">Sales Order Status</label>
+                         <Select value={selectedSalesOrderStatus} onValueChange={(value) => setSelectedSalesOrderStatus(value as SalesOrderStatus | "ALL")}>
+                            <SelectTrigger><SelectValue placeholder="Filter by status" /></SelectTrigger>
+                            <SelectContent>
+                            <SelectItem value="ALL">All Statuses</SelectItem>
+                            {SALES_ORDER_STATUS_OPTIONS.map(status => <SelectItem key={status} value={status}>{status}</SelectItem>)}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                </div>
+            }
+            onExport={() => handleExportCSV(salesOrderReport, "Sales Order Report", ["ID", "Customer", "Status", "Payment Status", "Date", "# Items", "Total"])}
         />
 
         <ReportCard
             title="Commission Report per Mechanic"
-            description="Tracks commissions earned by mechanics based on global filters (date, mechanic)."
+            description="Tracks commissions earned by mechanics from Job Orders (global date & mechanic filters apply)."
             reportKey="commissionReport"
             data={commissionReport}
             columns={[
                 { key: 'Mechanic', label: 'Mechanic' }, { key: 'JobOrderID', label: 'Job ID' }, { key: 'Service', label: 'Service' },
                 { key: 'LaborCost', label: 'Labor' }, { key: 'CommissionRate', label: 'Rate' }, { key: 'CommissionEarned', label: 'Earned' }
             ]}
+             customFilters={ // Only Mechanic filter specific to this report
+                <div className="grid grid-cols-1 sm:grid-cols-1 gap-4 mb-4">
+                    <div className="grid gap-1.5">
+                        <label className="text-sm font-medium">Mechanic (for Commission Report)</label>
+                        <Select value={selectedMechanicId} onValueChange={setSelectedMechanicId}>
+                            <SelectTrigger><SelectValue placeholder="Filter by mechanic" /></SelectTrigger>
+                            <SelectContent>
+                            <SelectItem value="ALL">All Mechanics</SelectItem>
+                            {allMechanics.map(mech => <SelectItem key={mech.id} value={mech.id}>{mech.name}</SelectItem>)}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                </div>
+            }
             onExport={() => handleExportCSV(commissionReport, "Commission Report", ["Mechanic", "Job ID", "Service", "Labor Cost", "Commission Rate/Amount", "Commission Earned"])}
         />
 
         <ReportCard
             title="Parts Usage Report"
-            description="Details parts consumed in job orders within the selected date range."
+            description="Details parts consumed in both Job Orders and Sales Orders within the selected date range."
             reportKey="partsUsage"
             data={partsUsageReport}
             columns={[{ key: 'Name', label: 'Part Name' }, { key: 'SKU', label: 'SKU' }, { key: 'QuantityUsed', label: 'Qty Used' }, { key: 'TotalValue', label: 'Total Value' }]}
@@ -427,7 +501,7 @@ export default function ReportsPage() {
         
         <ReportCard
             title="Service Sales Report"
-            description="Summary of services performed and revenue generated within the date range."
+            description="Summary of services performed (from Job Orders) and revenue generated within the date range."
             reportKey="serviceSales"
             data={serviceSalesReport}
             columns={[{ key: 'ServiceName', label: 'Service Name' }, { key: 'TimesPerformed', label: 'Times Performed' }, { key: 'TotalRevenue', label: 'Total Labor Revenue' }]}
@@ -463,8 +537,9 @@ export default function ReportsPage() {
 
         <ReportCard
             title="Income Summary"
-            description="Total income from payments received within the selected date range."
+            description="Total income from payments received (Job Orders & Sales Orders) within the selected date range."
             reportKey="incomeSummary"
+            icon={<DollarSign className="h-5 w-5 text-primary" />}
             data={incomeSummary.totalIncome > 0 ? [{ "DateRange": `${format(startDate || new Date(), "yyyy-MM-dd")} to ${format(endDate || new Date(), "yyyy-MM-dd")}`, "TotalIncome": `${currencySymbol}${incomeSummary.totalIncome.toFixed(2)}` }] : []} 
             columns={[{ key: 'DateRange', label: 'Period'}, { key: 'TotalIncome', label: 'Total Income'}]}
             onExport={() => handleExportCSV([{ "Date Range": `${format(startDate || new Date(), "yyyy-MM-dd")} to ${format(endDate || new Date(), "yyyy-MM-dd")}`, "Total Income": `${currencySymbol}${incomeSummary.totalIncome.toFixed(2)}` }], "Income Summary", ["Period", "Total Income"])}
@@ -474,11 +549,11 @@ export default function ReportsPage() {
         </ReportCard>
         
         <ReportCard
-            title="Customer Service History"
-            description="View all job orders for a specific customer."
+            title="Customer Service & Sales History"
+            description="View all job orders and sales orders for a specific customer."
             reportKey="customerServiceHistory"
             data={customerServiceHistory}
-            columns={[{ key: 'JobOrderID', label: 'Job ID' }, { key: 'Date', label: 'Date' }, { key: 'Motorcycle', label: 'Motorcycle/Type' }, { key: 'Services', label: 'Services/Type' }, { key: 'Total', label: 'Total' }]}
+            columns={[{ key: 'OrderID', label: 'Order ID' }, {key: 'Type', label: 'Type'}, { key: 'Date', label: 'Date' }, { key: 'Details', label: 'Details' }, { key: 'Total', label: 'Total' }]}
             customFilters={
                 <div className="grid gap-1.5 mb-4">
                     <label className="text-sm font-medium">Select Customer</label>
@@ -491,7 +566,7 @@ export default function ReportsPage() {
                     </Select>
                 </div>
             }
-            onExport={() => handleExportCSV(customerServiceHistory, `Customer Service History ${selectedCustomerIdForHistory !== "ALL" ? customerMap.get(selectedCustomerIdForHistory) : ""}`, ["Job ID", "Date", "Motorcycle/Type", "Services/Type", "Total"])}
+            onExport={() => handleExportCSV(customerServiceHistory, `Customer History ${selectedCustomerIdForHistory !== "ALL" ? customerMap.get(selectedCustomerIdForHistory) : ""}`, ["Order ID", "Type", "Date", "Details", "Total"])}
         />
       </div>
       <CardDescription className="text-center text-xs mt-4">

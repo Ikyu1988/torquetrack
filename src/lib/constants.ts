@@ -16,11 +16,19 @@ export const JOB_ORDER_STATUSES = {
   READY_FOR_PICKUP: 'Ready for Pickup',
   COMPLETED: 'Completed',
   CANCELLED: 'Cancelled',
-  SALE_COMPLETED: 'Sale - Completed', // New status for direct sales
+  // SALE_COMPLETED: 'Sale - Completed', // Removed: Sales Orders are now separate
 } as const;
 
 export type JobOrderStatus = typeof JOB_ORDER_STATUSES[keyof typeof JOB_ORDER_STATUSES];
 export const JOB_ORDER_STATUS_OPTIONS = Object.values(JOB_ORDER_STATUSES);
+
+export const SALES_ORDER_STATUSES = {
+  DRAFT: 'Draft',
+  COMPLETED: 'Completed',
+  CANCELLED: 'Cancelled',
+} as const;
+export type SalesOrderStatus = typeof SALES_ORDER_STATUSES[keyof typeof SALES_ORDER_STATUSES];
+export const SALES_ORDER_STATUS_OPTIONS = Object.values(SALES_ORDER_STATUSES);
 
 
 export const PAYMENT_STATUSES = {
@@ -88,3 +96,4 @@ export const GOODS_RECEIPT_STATUSES = {
 } as const;
 export type GoodsReceiptStatus = typeof GOODS_RECEIPT_STATUSES[keyof typeof GOODS_RECEIPT_STATUSES];
 export const GOODS_RECEIPT_STATUS_OPTIONS = Object.values(GOODS_RECEIPT_STATUSES);
+

@@ -58,10 +58,10 @@ const initialJobOrders: JobOrder[] = [
     paymentStatus: PAYMENT_STATUSES.UNPAID,
     amountPaid: 0,
     paymentHistory: [],
-    createdAt: new Date(new Date().setDate(new Date().getDate() - 2)), // Make it 2 days ago
+    createdAt: new Date(new Date().setDate(new Date().getDate() - 2)), 
     updatedAt: new Date(new Date().setDate(new Date().getDate() - 2)),
     createdByUserId: "user123",
-    estimatedCompletionDate: new Date(new Date().setDate(new Date().getDate() + 1)), // 1 day from now
+    estimatedCompletionDate: new Date(new Date().setDate(new Date().getDate() + 1)), 
   },
   {
     id: "jo2",
@@ -81,9 +81,9 @@ const initialJobOrders: JobOrder[] = [
     paymentStatus: PAYMENT_STATUSES.PAID,
     amountPaid: 537.50,
     paymentHistory: [
-        { id: "pay1", jobOrderId: "jo2", amount: 537.50, paymentDate: new Date(new Date().setDate(new Date().getDate() -1)), method: "Credit Card", processedByUserId: "user456", createdAt: new Date(new Date().setDate(new Date().getDate() -1)), notes: "Paid in full via CC" } 
+        { id: "pay1", orderId: "jo2", orderType: 'JobOrder', amount: 537.50, paymentDate: new Date(new Date().setDate(new Date().getDate() -1)), method: "Credit Card", processedByUserId: "user456", createdAt: new Date(new Date().setDate(new Date().getDate() -1)), notes: "Paid in full via CC" } 
     ],
-    createdAt: new Date(new Date().setDate(new Date().getDate() - 1)), // Make it yesterday
+    createdAt: new Date(new Date().setDate(new Date().getDate() - 1)), 
     updatedAt: new Date(new Date().setDate(new Date().getDate() - 1)),
     createdByUserId: "user456",
     actualCompletionDate: new Date(new Date().setDate(new Date().getDate() - 1)), 
@@ -131,7 +131,8 @@ if (typeof window !== 'undefined') {
         if (newJobOrder.paymentStatus === PAYMENT_STATUSES.PAID && newJobOrder.amountPaid > 0 && newJobOrder.paymentHistory.length === 0) {
             const initialPayment: Payment = {
                 id: String(Date.now() + 1), 
-                jobOrderId: newJobOrder.id,
+                orderId: newJobOrder.id,
+                orderType: 'JobOrder',
                 amount: newJobOrder.amountPaid,
                 paymentDate: new Date(),
                 method: jobOrderData.initialPaymentMethod || 'Cash', 
@@ -229,13 +230,20 @@ if (typeof window !== 'undefined') {
       getJobOrderById: (jobOrderId: string) => {
         const jobOrder = (window as any).__jobOrderStore.jobOrders.find((jo: JobOrder) => jo.id === jobOrderId);
         if (jobOrder && (window as any).__paymentStore) {
-            const payments = (window as any).__paymentStore.getPaymentsByJobOrderId(jobOrder.id);
+            const payments = (window as any).__paymentStore.getPaymentsByOrderId(jobOrder.id, 'JobOrder');
             jobOrder.paymentHistory = payments;
             jobOrder.amountPaid = payments.reduce((sum: number, p: Payment) => sum + p.amount, 0);
-            if (jobOrder.amountPaid >= jobOrder.grandTotal && jobOrder.grandTotal > 0.001) jobOrder.paymentStatus = PAYMENT_STATUSES.PAID;
-            else if (jobOrder.grandTotal <= 0.001 && jobOrder.amountPaid <= 0.001) jobOrder.paymentStatus = PAYMENT_STATUSES.PAID; 
-            else if (jobOrder.amountPaid > 0) jobOrder.paymentStatus = PAYMENT_STATUSES.PARTIAL;
-            else jobOrder.paymentStatus = PAYMENT_STATUSES.UNPAID;
+            
+            const grandTotalNum = Number(jobOrder.grandTotal) || 0;
+            if (jobOrder.amountPaid >= grandTotalNum - 0.001 && grandTotalNum > 0.001) {
+                 jobOrder.paymentStatus = PAYMENT_STATUSES.PAID;
+            } else if (grandTotalNum <= 0.001 && jobOrder.amountPaid <= 0.001) {
+                 jobOrder.paymentStatus = PAYMENT_STATUSES.PAID;
+            } else if (jobOrder.amountPaid > 0) {
+                 jobOrder.paymentStatus = PAYMENT_STATUSES.PARTIAL;
+            } else {
+                 jobOrder.paymentStatus = PAYMENT_STATUSES.UNPAID;
+            }
         }
         return jobOrder;
       },
@@ -245,10 +253,9 @@ if (typeof window !== 'undefined') {
           const jobOrder = (window as any).__jobOrderStore.jobOrders[joIndex];
           if (!jobOrder.paymentHistory.find(p => p.id === payment.id)) {
             jobOrder.paymentHistory.push(payment);
-            jobOrder.amountPaid += payment.amount;
-          } else {
-            jobOrder.amountPaid = jobOrder.paymentHistory.reduce((sum: number, p: Payment) => sum + p.amount, 0);
           }
+          // Recalculate amountPaid and paymentStatus
+          jobOrder.amountPaid = jobOrder.paymentHistory.reduce((sum: number, p: Payment) => sum + p.amount, 0);
           
           const grandTotalNum = Number(jobOrder.grandTotal) || 0;
           if (jobOrder.amountPaid >= grandTotalNum - 0.001 && grandTotalNum > 0.001) {
@@ -366,7 +373,7 @@ export default function JobOrdersPage() {
         refreshJobOrders();
         toast({
           title: "Job Order Deleted",
-          description: `Job Order/Sale #${jobOrderToDelete.id.substring(0,6)} has been successfully deleted.`,
+          description: `Job Order #${jobOrderToDelete.id.substring(0,6)} has been successfully deleted.`,
         });
       }
     }
@@ -406,9 +413,9 @@ export default function JobOrdersPage() {
           <div>
             <div className="flex items-center gap-3">
               <ClipboardList className="h-6 w-6 text-primary" />
-              <CardTitle className="font-headline text-2xl">Job Orders & Sales</CardTitle>
+              <CardTitle className="font-headline text-2xl">Job Orders</CardTitle>
             </div>
-            <CardDescription>Manage all workshop job orders and direct sales.</CardDescription>
+            <CardDescription>Manage all workshop job orders for services and repairs.</CardDescription>
           </div>
           <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
             <div className="relative w-full sm:w-auto md:w-48">
@@ -444,7 +451,7 @@ export default function JobOrdersPage() {
                 <TableRow>
                   <TableHead>ID</TableHead>
                   <TableHead>Customer</TableHead>
-                  <TableHead>Motorcycle/Type</TableHead>
+                  <TableHead>Motorcycle</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Payment</TableHead>
                   <TableHead className="text-right">Total</TableHead>
@@ -456,14 +463,14 @@ export default function JobOrdersPage() {
                 {filteredJobOrders.map((jo) => (
                   <TableRow key={jo.id}>
                     <TableCell className="font-medium">{`#${jo.id.substring(0,6)}`}</TableCell>
-                    <TableCell>{jo.customerId ? customerMap.get(jo.customerId) || "N/A" : "Walk-in Sale"}</TableCell>
+                    <TableCell>{jo.customerId ? customerMap.get(jo.customerId) || "N/A" : "N/A"}</TableCell>
                     <TableCell>
                         {jo.motorcycleId 
                             ? `${motorcycleMap.get(jo.motorcycleId)?.make} ${motorcycleMap.get(jo.motorcycleId)?.model} (${motorcycleMap.get(jo.motorcycleId)?.plateNumber || 'N/A'})`
-                            : (jo.status === JOB_ORDER_STATUSES.SALE_COMPLETED ? "Direct Sale" : "N/A")
+                            : "N/A"
                         }
                     </TableCell>
-                    <TableCell><Badge variant={jo.status === JOB_ORDER_STATUSES.COMPLETED || jo.status === JOB_ORDER_STATUSES.SALE_COMPLETED ? "default" : "secondary"}>{jo.status}</Badge></TableCell>
+                    <TableCell><Badge variant={jo.status === JOB_ORDER_STATUSES.COMPLETED ? "default" : "secondary"}>{jo.status}</Badge></TableCell>
                     <TableCell><Badge variant={jo.paymentStatus === PAYMENT_STATUSES.PAID ? "default" : (jo.paymentStatus === PAYMENT_STATUSES.UNPAID ? "destructive" : "secondary") }>{jo.paymentStatus}</Badge></TableCell>
                     <TableCell className="text-right">{currency}{(Number(jo.grandTotal) || 0).toFixed(2)}</TableCell>
                     <TableCell>{format(new Date(jo.createdAt), "MMM dd, yyyy")}</TableCell>
@@ -474,14 +481,12 @@ export default function JobOrdersPage() {
                           <span className="sr-only">View</span>
                         </Link>
                       </Button>
-                       {jo.status !== JOB_ORDER_STATUSES.SALE_COMPLETED && (
-                        <Button variant="ghost" size="icon" asChild className="hover:text-primary">
-                            <Link href={`/dashboard/job-orders/${jo.id}/edit`}>
-                            <Pencil className="h-4 w-4" />
-                            <span className="sr-only">Edit</span>
-                            </Link>
-                        </Button>
-                       )}
+                      <Button variant="ghost" size="icon" asChild className="hover:text-primary">
+                          <Link href={`/dashboard/job-orders/${jo.id}/edit`}>
+                          <Pencil className="h-4 w-4" />
+                          <span className="sr-only">Edit</span>
+                          </Link>
+                      </Button>
                       <Button 
                         variant="ghost" 
                         size="icon" 
@@ -499,8 +504,8 @@ export default function JobOrdersPage() {
           ) : (
             <div className="flex flex-col items-center justify-center gap-4 py-10 text-muted-foreground">
                 <ClipboardList className="h-16 w-16" />
-                <p className="text-lg">{searchTerm || statusFilter !== "ALL" ? "No job orders match your criteria." : "No job orders or sales found."}</p>
-                {!(searchTerm || statusFilter !== "ALL") && <p>Get started by creating a new job order or making a direct sale.</p>}
+                <p className="text-lg">{searchTerm || statusFilter !== "ALL" ? "No job orders match your criteria." : "No job orders found."}</p>
+                {!(searchTerm || statusFilter !== "ALL") && <p>Get started by creating a new job order.</p>}
             </div>
           )}
         </CardContent>
@@ -511,8 +516,8 @@ export default function JobOrdersPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
             <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete Order/Sale #{jobOrderToDelete?.id.substring(0,6)}.
-              If this is a direct sale or a job order with parts, stock levels for those parts will be readjusted. Associated payment records will also be removed.
+              This action cannot be undone. This will permanently delete Job Order #{jobOrderToDelete?.id.substring(0,6)}.
+              Stock levels for any parts used will be readjusted. Associated payment records will also be removed.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

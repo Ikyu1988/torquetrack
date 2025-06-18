@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import type { JobOrder, Customer, Motorcycle, Mechanic, Payment, ShopSettings } from "@/types";
-import { ArrowLeft, ClipboardList, Edit, Printer, Send, UserCog, PackageSearch, Wrench, CreditCard, PlusCircle, ShoppingCart } from "lucide-react";
+import { ArrowLeft, ClipboardList, Edit, Printer, Send, UserCog, PackageSearch, Wrench, CreditCard, PlusCircle } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState, useMemo, useCallback } from "react";
@@ -29,8 +29,8 @@ if (typeof window !== 'undefined' && !(window as any).__paymentStore) {
             (window as any).__paymentStore.payments.push(newPayment);
             return newPayment;
         },
-        getPaymentsByJobOrderId: (jobOrderId: string) => {
-            return (window as any).__paymentStore.payments.filter((p: Payment) => p.jobOrderId === jobOrderId);
+        getPaymentsByOrderId: (orderId: string, orderType: 'JobOrder' | 'SalesOrder') => {
+            return (window as any).__paymentStore.payments.filter((p: Payment) => p.orderId === orderId && p.orderType === orderType);
         },
         deletePaymentById: (paymentId: string) => {
             (window as any).__paymentStore.payments = (window as any).__paymentStore.payments.filter((p: Payment) => p.id !== paymentId);
@@ -56,7 +56,6 @@ export default function ViewJobOrderPage() {
   const [shopSettings, setShopSettings] = useState<ShopSettings | null>(null); 
 
   const currency = useMemo(() => shopSettings?.currencySymbol || '₱', [shopSettings]);
-  const isDirectSale = useMemo(() => jobOrder?.status === JOB_ORDER_STATUSES.SALE_COMPLETED, [jobOrder]);
 
   const refreshJobOrderData = useCallback(() => {
     if (jobOrderId && isMounted) {
@@ -96,7 +95,7 @@ export default function ViewJobOrderPage() {
         } else {
             toast({
             title: "Error",
-            description: "Job Order/Sale not found.",
+            description: "Job Order not found.",
             variant: "destructive",
             });
             router.push("/dashboard/job-orders");
@@ -162,11 +161,11 @@ export default function ViewJobOrderPage() {
 
 
   if (!isMounted || isLoading) {
-    return <div className="flex justify-center items-center h-screen"><p>Loading details...</p></div>;
+    return <div className="flex justify-center items-center h-screen"><p>Loading job order details...</p></div>;
   }
 
   if (!jobOrder) {
-    return <div className="flex justify-center items-center h-screen"><p>Order/Sale not found.</p></div>;
+    return <div className="flex justify-center items-center h-screen"><p>Job Order not found.</p></div>;
   }
   
   const isFullyPaid = jobOrder.paymentStatus === PAYMENT_STATUSES.PAID || balanceDue <= 0.001; 
@@ -177,7 +176,7 @@ export default function ViewJobOrderPage() {
         <Button variant="outline" asChild>
           <Link href="/dashboard/job-orders">
             <ArrowLeft className="mr-2 h-4 w-4" />
-            Back to Job Orders & Sales
+            Back to Job Orders
           </Link>
         </Button>
         <div className="flex gap-2">
@@ -189,7 +188,7 @@ export default function ViewJobOrderPage() {
             </Button>
             <Button asChild>
                 <Link href={`/dashboard/job-orders/${jobOrder.id}/edit`}>
-                    <Edit className="mr-2 h-4 w-4" /> Edit {isDirectSale ? "Sale" : "Job Order"}
+                    <Edit className="mr-2 h-4 w-4" /> Edit Job Order
                 </Link>
             </Button>
         </div>
@@ -199,21 +198,21 @@ export default function ViewJobOrderPage() {
         <CardHeader>
           <div className="flex items-center justify-between print:flex-row print:items-start">
             <div className="flex items-center gap-3">
-              {isDirectSale ? <ShoppingCart className="h-8 w-8 text-primary" /> : <ClipboardList className="h-8 w-8 text-primary" />}
+              <ClipboardList className="h-8 w-8 text-primary" />
               <div>
-                <CardTitle className="font-headline text-3xl">{isDirectSale ? "Direct Sale" : "Job Order"} #{jobOrder.id.substring(0,6)}</CardTitle>
+                <CardTitle className="font-headline text-3xl">Job Order #{jobOrder.id.substring(0,6)}</CardTitle>
                 <CardDescription>Created on: {format(new Date(jobOrder.createdAt), "PPP p")}</CardDescription>
               </div>
             </div>
             <div className="text-right">
                 <p className="text-sm text-muted-foreground">Status</p>
-                <Badge variant={jobOrder.status === "Completed" || jobOrder.status === "Sale - Completed" ? "default" : "secondary"} className="text-lg px-3 py-1">{jobOrder.status}</Badge>
+                <Badge variant={jobOrder.status === JOB_ORDER_STATUSES.COMPLETED ? "default" : "secondary"} className="text-lg px-3 py-1">{jobOrder.status}</Badge>
             </div>
           </div>
         </CardHeader>
         <CardContent className="space-y-6">
-        {jobOrder.customerId && customer && (
-          <div className={cn("grid grid-cols-1 gap-6", jobOrder.motorcycleId && motorcycle ? "md:grid-cols-2" : "md:grid-cols-1")}>
+        {(jobOrder.customerId && customer) && (
+          <div className={cn("grid grid-cols-1 gap-6", (jobOrder.motorcycleId && motorcycle) ? "md:grid-cols-2" : "md:grid-cols-1")}>
             <Card>
               <CardHeader><CardTitle className="text-xl">Customer Details</CardTitle></CardHeader>
               <CardContent>
@@ -222,7 +221,7 @@ export default function ViewJobOrderPage() {
                 <DetailItem label="Email" value={customer?.email} />
               </CardContent>
             </Card>
-             {jobOrder.motorcycleId && motorcycle && !isDirectSale && (
+             {(jobOrder.motorcycleId && motorcycle) && (
                 <Card>
                 <CardHeader><CardTitle className="text-xl">Motorcycle Details</CardTitle></CardHeader>
                 <CardContent>
@@ -237,9 +236,9 @@ export default function ViewJobOrderPage() {
         )}
           
           <Separator />
-           {(jobOrder.diagnostics && (!isDirectSale || jobOrder.diagnostics !== "Direct Parts Sale")) && (
+           {jobOrder.diagnostics && (
             <>
-              <DetailItem label={isDirectSale ? "Sale Type" : "Diagnostics / Customer Complaint"} value={jobOrder.diagnostics} />
+              <DetailItem label="Diagnostics / Customer Complaint" value={jobOrder.diagnostics} />
               <Separator />
             </>
            )}
@@ -357,10 +356,10 @@ export default function ViewJobOrderPage() {
                         isBadge 
                         badgeVariant={jobOrder.paymentStatus === PAYMENT_STATUSES.PAID ? "default" : (jobOrder.paymentStatus === PAYMENT_STATUSES.UNPAID ? "destructive" : "secondary")} 
                     />
-                    {!isDirectSale && jobOrder.estimatedCompletionDate && (
+                    {jobOrder.estimatedCompletionDate && (
                         <DetailItem label="Estimated Completion Date" value={jobOrder.estimatedCompletionDate} />
                     )}
-                    {!isDirectSale && jobOrder.actualCompletionDate && (
+                    {jobOrder.actualCompletionDate && (
                         <DetailItem label="Actual Completion Date" value={jobOrder.actualCompletionDate} />
                     )}
                     
@@ -399,8 +398,6 @@ export default function ViewJobOrderPage() {
                      {isFullyPaid && jobOrder.grandTotal === 0 && (
                         <p className="text-sm text-green-600 mt-4">Zero balance order marked as paid.</p>
                      )}
-
-
                 </CardContent>
             </Card>
           </div>
@@ -421,5 +418,4 @@ export default function ViewJobOrderPage() {
       )}
     </div>
   );
-
-    
+}
