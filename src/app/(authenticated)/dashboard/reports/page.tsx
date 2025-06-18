@@ -4,7 +4,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { FileText, DollarSign, BarChart2, Package, Users, UserCog, CalendarDays, Download, Filter, Search } from "lucide-react";
+import { FileText, BarChart2, DollarSign, Download, Filter, Search } from "lucide-react"; // Removed unused icons
 import { DatePicker } from "@/components/ui/date-picker";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
@@ -14,7 +14,6 @@ import type { JobOrder, Customer, Mechanic, Part, Service, Payment, ShopSettings
 import { JOB_ORDER_STATUS_OPTIONS, JOB_ORDER_STATUSES, COMMISSION_TYPES } from "@/lib/constants";
 import { format } from "date-fns";
 
-// Helper to convert array of objects to CSV string
 const convertToCSV = (data: any[], headers?: string[]): string => {
   if (data.length === 0) return "";
   const array = [Object.keys(data[0]), ...data.map(item => Object.values(item))];
@@ -51,13 +50,11 @@ export default function ReportsPage() {
   const { toast } = useToast();
   const [isMounted, setIsMounted] = useState(false);
 
-  // Global Filters
   const [startDate, setStartDate] = useState<Date | undefined>(new Date(new Date().getFullYear(), new Date().getMonth(), 1));
   const [endDate, setEndDate] = useState<Date | undefined>(new Date());
   const [selectedStatus, setSelectedStatus] = useState<JobOrderStatus | "ALL">("ALL");
   const [selectedMechanicId, setSelectedMechanicId] = useState<string | "ALL">("ALL");
   
-  // Data States
   const [allJobOrders, setAllJobOrders] = useState<JobOrder[]>([]);
   const [allMechanics, setAllMechanics] = useState<Mechanic[]>([]);
   const [allCustomers, setAllCustomers] = useState<Customer[]>([]);
@@ -66,7 +63,6 @@ export default function ReportsPage() {
   const [allPayments, setAllPayments] = useState<Payment[]>([]);
   const [shopSettings, setShopSettings] = useState<ShopSettings | null>(null);
 
-  // Report Specific States
   const [jobOrderSummary, setJobOrderSummary] = useState<any[]>([]);
   const [commissionReport, setCommissionReport] = useState<any[]>([]);
   const [partsUsageReport, setPartsUsageReport] = useState<any[]>([]);
@@ -78,7 +74,7 @@ export default function ReportsPage() {
 
   const [loading, setLoading] = useState<Record<string, boolean>>({});
 
-  const currencySymbol = useMemo(() => shopSettings?.currencySymbol || '$', [shopSettings]);
+  const currencySymbol = useMemo(() => shopSettings?.currencySymbol || '₱', [shopSettings]);
 
   useEffect(() => {
     setIsMounted(true);
@@ -117,7 +113,6 @@ export default function ReportsPage() {
 
     setLoading(prev => ({ ...prev, [reportType]: true }));
 
-    // Simulate API call & processing
     setTimeout(() => {
       try {
         const filteredJobOrders = allJobOrders.filter(jo => {
@@ -125,7 +120,6 @@ export default function ReportsPage() {
           const inDateRange = joDate >= startDate && joDate <= endDate;
           const statusMatch = selectedStatus === "ALL" || jo.status === selectedStatus;
           
-          // Mechanic filter applies if any service has the selected mechanic or if ALL mechanics are selected
           const mechanicMatch = selectedMechanicId === "ALL" || 
                                 (jo.servicesPerformed && jo.servicesPerformed.some(s => s.assignedMechanicId === selectedMechanicId));
           
@@ -148,7 +142,7 @@ export default function ReportsPage() {
           
           case "commissionReport":
             let commissions: any[] = [];
-            allJobOrders.filter(jo => { // Filter by date first
+            allJobOrders.filter(jo => { 
                 const joDate = new Date(jo.createdAt);
                 return joDate >= startDate && joDate <= endDate;
             }).forEach(jo => {
@@ -170,7 +164,7 @@ export default function ReportsPage() {
                     JobOrderID: jo.id.substring(0,6),
                     Service: serviceItem.serviceName,
                     LaborCost: `${currencySymbol}${serviceItem.laborCost.toFixed(2)}`,
-                    CommissionRate: `${serviceDetails.commissionValue}${serviceDetails.commissionType === COMMISSION_TYPES.PERCENTAGE ? '%' : currencySymbol}`,
+                    CommissionRate: `${serviceDetails.commissionType === COMMISSION_TYPES.FIXED ? currencySymbol : ''}${serviceDetails.commissionValue}${serviceDetails.commissionType === COMMISSION_TYPES.PERCENTAGE ? '%' : ''}`,
                     CommissionEarned: `${currencySymbol}${commissionAmount.toFixed(2)}`,
                   });
                 }
@@ -211,7 +205,7 @@ export default function ReportsPage() {
           case "inventoryValuation":
             let totalVal = 0;
             const valuationDetails = allParts.map(part => {
-                const value = part.stockQuantity * (part.cost ?? part.price); // Use cost if available, else price
+                const value = part.stockQuantity * (part.cost ?? part.price); 
                 totalVal += value;
                 return {
                     PartName: part.name,
@@ -424,7 +418,7 @@ export default function ReportsPage() {
             title="Income Summary"
             description="Total income from payments received within the selected date range."
             reportKey="incomeSummary"
-            data={[]} // Data is shown directly in children
+            data={[]} 
             columns={[]}
              onExport={() => handleExportCSV([{ "Date Range": `${format(startDate || new Date(), "yyyy-MM-dd")} to ${format(endDate || new Date(), "yyyy-MM-dd")}`, "Total Income": `${currencySymbol}${incomeSummary.totalIncome.toFixed(2)}` }], "Income Summary")}
         >
@@ -453,7 +447,7 @@ export default function ReportsPage() {
         />
       </div>
       <CardDescription className="text-center text-xs mt-4">
-        Note: PDF and Excel exports are more complex and typically require server-side processing or dedicated client-side libraries. CSV export is provided as an example.
+        Note: More advanced export formats (Excel, PDF) typically require server-side processing or larger client-side libraries and are not included in this example.
       </CardDescription>
     </div>
   );

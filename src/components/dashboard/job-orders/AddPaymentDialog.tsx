@@ -27,7 +27,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { DatePicker } from "@/components/ui/date-picker";
 import { PAYMENT_METHOD_OPTIONS, PAYMENT_STATUSES } from "@/lib/constants";
 import type { JobOrder, Payment, PaymentMethod } from "@/types";
-import { DollarSign } from "lucide-react";
+import React from "react"; // Added React import for React.useEffect
 
 interface AddPaymentDialogProps {
   isOpen: boolean;
@@ -46,20 +46,19 @@ const paymentFormSchema = z.object({
 
 type PaymentFormValues = z.infer<typeof paymentFormSchema>;
 
-export function AddPaymentDialog({ isOpen, onOpenChange, jobOrder, onPaymentAdded, currencySymbol = "$" }: AddPaymentDialogProps) {
+export function AddPaymentDialog({ isOpen, onOpenChange, jobOrder, onPaymentAdded, currencySymbol = "₱" }: AddPaymentDialogProps) { // Changed default to ₱
   const balanceDue = jobOrder.grandTotal - jobOrder.amountPaid;
 
   const form = useForm<PaymentFormValues>({
     resolver: zodResolver(paymentFormSchema),
     defaultValues: {
-      amount: Math.max(0.01, balanceDue), // Default to remaining balance, but not less than 0.01
+      amount: Math.max(0.01, balanceDue), 
       paymentDate: new Date(),
       method: "Cash",
       notes: "",
     },
   });
   
-  // Reset form when dialog opens with new job order or balance changes
   React.useEffect(() => {
     if (isOpen) {
         form.reset({
@@ -94,9 +93,6 @@ export function AddPaymentDialog({ isOpen, onOpenChange, jobOrder, onPaymentAdde
   return (
     <Dialog open={isOpen} onOpenChange={(open) => {
         onOpenChange(open);
-        if (!open) {
-            // form.reset() done in useEffect to ensure correct balanceDue
-        }
     }}>
       <DialogContent className="sm:max-w-[480px]">
         <DialogHeader>
@@ -189,4 +185,3 @@ export function AddPaymentDialog({ isOpen, onOpenChange, jobOrder, onPaymentAdde
     </Dialog>
   );
 }
-

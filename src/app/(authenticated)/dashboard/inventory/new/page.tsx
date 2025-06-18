@@ -20,8 +20,9 @@ import Link from "next/link";
 import { ArrowLeft, Package } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
-import type { Part } from "@/types";
+import type { Part, ShopSettings } from "@/types";
 import { Switch } from "@/components/ui/switch";
+import { useEffect, useState, useMemo } from "react";
 
 const partFormSchema = z.object({
   name: z.string().min(1, { message: "Part name is required." }).max(100),
@@ -42,6 +43,17 @@ type PartFormValues = z.infer<typeof partFormSchema>;
 export default function NewPartPage() {
   const { toast } = useToast();
   const router = useRouter();
+  const [shopSettings, setShopSettings] = useState<ShopSettings | null>(null);
+  const [isMounted, setIsMounted] = useState(false);
+
+  const currency = useMemo(() => shopSettings?.currencySymbol || '₱', [shopSettings]);
+
+  useEffect(() => {
+    setIsMounted(true);
+    if (typeof window !== 'undefined' && (window as any).__settingsStore) {
+      setShopSettings((window as any).__settingsStore.getSettings());
+    }
+  }, []);
 
   const form = useForm<PartFormValues>({
     resolver: zodResolver(partFormSchema),
@@ -85,6 +97,10 @@ export default function NewPartPage() {
         variant: "destructive",
       });
     }
+  }
+
+  if (!isMounted) {
+    return <div className="flex justify-center items-center h-screen"><p>Loading form...</p></div>;
   }
 
   return (
@@ -171,9 +187,9 @@ export default function NewPartPage() {
                   name="price"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Selling Price ($)</FormLabel>
+                      <FormLabel>Selling Price ({currency})</FormLabel>
                       <FormControl>
-                        <Input type="number" step="0.01" placeholder="e.g., 15.99" {...field} onChange={e => field.onChange(parseFloat(e.target.value) || 0)} />
+                        <Input type="number" step="0.01" placeholder="e.g., 750.00" {...field} onChange={e => field.onChange(parseFloat(e.target.value) || 0)} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -184,9 +200,9 @@ export default function NewPartPage() {
                   name="cost"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Purchase Cost ($) (Optional)</FormLabel>
+                      <FormLabel>Purchase Cost ({currency}) (Optional)</FormLabel>
                       <FormControl>
-                        <Input type="number" step="0.01" placeholder="e.g., 8.50" {...field} onChange={e => field.onChange(e.target.value === '' ? '' : parseFloat(e.target.value) || 0)} />
+                        <Input type="number" step="0.01" placeholder="e.g., 400.00" {...field} onChange={e => field.onChange(e.target.value === '' ? '' : parseFloat(e.target.value) || 0)} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>

@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PlusCircle, Wrench, Pencil, Trash2 } from "lucide-react";
@@ -25,7 +25,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
-import type { Service } from "@/types";
+import type { Service, ShopSettings } from "@/types";
 import { Badge } from "@/components/ui/badge";
 import { COMMISSION_TYPES } from "@/lib/constants";
 
@@ -34,11 +34,11 @@ const initialServices: Service[] = [
     id: "svc1",
     name: "Oil Change",
     category: "Maintenance",
-    defaultLaborCost: 50,
+    defaultLaborCost: 2500, // Example in Pesos
     estimatedHours: 1,
     isActive: true,
     commissionType: COMMISSION_TYPES.FIXED,
-    commissionValue: 5,
+    commissionValue: 250, // Example in Pesos
     createdAt: new Date(),
     updatedAt: new Date(),
   },
@@ -46,7 +46,7 @@ const initialServices: Service[] = [
     id: "svc2",
     name: "Tire Replacement",
     category: "Wheels",
-    defaultLaborCost: 75,
+    defaultLaborCost: 3750, // Example in Pesos
     estimatedHours: 1.5,
     isActive: true,
     commissionType: COMMISSION_TYPES.PERCENTAGE,
@@ -58,7 +58,7 @@ const initialServices: Service[] = [
     id: "svc3",
     name: "Engine Tune-up",
     category: "Engine",
-    defaultLaborCost: 150,
+    defaultLaborCost: 7500, // Example in Pesos
     estimatedHours: 3,
     isActive: false,
     createdAt: new Date(),
@@ -105,11 +105,19 @@ export default function ServicesPage() {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [serviceToDelete, setServiceToDelete] = useState<Service | null>(null);
   const [isMounted, setIsMounted] = useState(false);
+  const [shopSettings, setShopSettings] = useState<ShopSettings | null>(null);
+
+  const currency = useMemo(() => shopSettings?.currencySymbol || '₱', [shopSettings]);
 
   useEffect(() => {
     setIsMounted(true);
-    if (typeof window !== 'undefined' && (window as any).__serviceStore) {
-      setServices([...(window as any).__serviceStore.services]);
+    if (typeof window !== 'undefined') {
+      if ((window as any).__serviceStore) {
+        setServices([...(window as any).__serviceStore.services]);
+      }
+      if ((window as any).__settingsStore) {
+        setShopSettings((window as any).__settingsStore.getSettings());
+      }
     }
   }, []);
 
@@ -192,10 +200,10 @@ export default function ServicesPage() {
                   <TableRow key={service.id}>
                     <TableCell className="font-medium">{service.name}</TableCell>
                     <TableCell>{service.category || "-"}</TableCell>
-                    <TableCell>${service.defaultLaborCost.toFixed(2)}</TableCell>
+                    <TableCell>{currency}{service.defaultLaborCost.toFixed(2)}</TableCell>
                     <TableCell>
                       {service.commissionType && service.commissionValue !== undefined 
-                        ? `${service.commissionType === COMMISSION_TYPES.FIXED ? '$' : ''}${service.commissionValue}${service.commissionType === COMMISSION_TYPES.PERCENTAGE ? '%' : ''} (${service.commissionType})`
+                        ? `${service.commissionType === COMMISSION_TYPES.FIXED ? currency : ''}${service.commissionValue}${service.commissionType === COMMISSION_TYPES.PERCENTAGE ? '%' : ''} (${service.commissionType})`
                         : "-"}
                     </TableCell>
                     <TableCell>
@@ -253,4 +261,3 @@ export default function ServicesPage() {
     </div>
   );
 }
-

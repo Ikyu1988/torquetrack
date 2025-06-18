@@ -16,7 +16,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ShoppingCart, DollarSign, PlusCircle, Trash2 } from "lucide-react";
+import { ShoppingCart, PlusCircle, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
 import type { JobOrder, Customer, Part, PaymentMethod, ShopSettings } from "@/types";
@@ -26,16 +26,16 @@ import { JOB_ORDER_STATUSES, PAYMENT_STATUSES, PAYMENT_METHOD_OPTIONS } from "@/
 import { Separator } from "@/components/ui/separator";
 
 const directSalePartItemSchema = z.object({
-  id: z.string(), // Unique ID for this line item in the form
+  id: z.string(), 
   partId: z.string().min(1, "Part selection is required."),
-  partName: z.string(), // Auto-filled
+  partName: z.string(), 
   quantity: z.coerce.number().int().min(1, "Quantity must be at least 1."),
-  pricePerUnit: z.coerce.number().min(0), // Auto-filled
-  totalPrice: z.coerce.number().min(0), // Auto-calculated
+  pricePerUnit: z.coerce.number().min(0), 
+  totalPrice: z.coerce.number().min(0), 
 });
 
 const directSaleFormSchema = z.object({
-  customerId: z.string().optional(), // Customer is optional
+  customerId: z.string().optional(), 
   partsUsed: z.array(directSalePartItemSchema).min(1, { message: "At least one part must be added to the sale." }),
   discountAmount: z.coerce.number().min(0, "Discount must be non-negative.").optional().or(z.literal('')),
   paymentMethod: z.enum(PAYMENT_METHOD_OPTIONS),
@@ -44,7 +44,6 @@ const directSaleFormSchema = z.object({
 
 type DirectSaleFormValues = z.infer<typeof directSaleFormSchema>;
 
-// Type for the input to addJobOrder, matching the one in job-orders/page.tsx store
 type AddJobOrderInput = Omit<JobOrder, 'id' | 'createdAt' | 'updatedAt' | 'createdByUserId' | 'grandTotal' | 'amountPaid' | 'paymentHistory'> & {
   initialPaymentMethod?: PaymentMethod;
   initialPaymentNotes?: string;
@@ -58,6 +57,8 @@ export default function DirectSalesPage() {
   const [availableParts, setAvailableParts] = useState<Part[]>([]);
   const [shopSettings, setShopSettings] = useState<ShopSettings | null>(null);
   const [isMounted, setIsMounted] = useState(false);
+
+  const currency = useMemo(() => shopSettings?.currencySymbol || '₱', [shopSettings]);
 
   const form = useForm<DirectSaleFormValues>({
     resolver: zodResolver(directSaleFormSchema),
@@ -113,10 +114,10 @@ export default function DirectSalesPage() {
             partsUsed: data.partsUsed.map(p => ({...p})), 
             diagnostics: "Direct Parts Sale",
             discountAmount: data.discountAmount === '' ? undefined : Number(data.discountAmount),
-            taxAmount: taxAmount, // Pass the calculated tax amount
+            taxAmount: taxAmount, 
             paymentStatus: PAYMENT_STATUSES.PAID,
-            initialPaymentMethod: data.paymentMethod, // Pass payment method from form
-            initialPaymentNotes: data.paymentNotes || `Payment for direct sale`, // Pass payment notes
+            initialPaymentMethod: data.paymentMethod, 
+            initialPaymentNotes: data.paymentNotes || `Payment for direct sale`, 
         };
       
       newSaleOrder = (window as any).__jobOrderStore.addJobOrder(saleOrderData);
@@ -124,7 +125,7 @@ export default function DirectSalesPage() {
       if (newSaleOrder) {
         toast({
           title: "Sale Completed",
-          description: `Direct sale #${newSaleOrder.id.substring(0,6)} processed successfully. Grand Total: ${shopSettings?.currencySymbol || '$'}${newSaleOrder.grandTotal.toFixed(2)}`,
+          description: `Direct sale #${newSaleOrder.id.substring(0,6)} processed successfully. Grand Total: ${currency}${newSaleOrder.grandTotal.toFixed(2)}`,
         });
         form.reset({ customerId: "", partsUsed: [], discountAmount: undefined, paymentMethod: "Cash", paymentNotes: "" });
         if ((window as any).__inventoryStore) {
@@ -215,7 +216,7 @@ export default function DirectSalesPage() {
                               <SelectContent>
                                 {availableParts.length === 0 && <SelectItem value="loading" disabled>No parts available or in stock.</SelectItem>}
                                 {availableParts.map(part => (
-                                  <SelectItem key={part.id} value={part.id} disabled={part.stockQuantity <=0 } >{part.name} (Stock: {part.stockQuantity}, Price: {shopSettings?.currencySymbol || '$'}{part.price.toFixed(2)})</SelectItem>
+                                  <SelectItem key={part.id} value={part.id} disabled={part.stockQuantity <=0 } >{part.name} (Stock: {part.stockQuantity}, Price: {currency}{part.price.toFixed(2)})</SelectItem>
                                 ))}
                               </SelectContent>
                             </Select>
@@ -249,7 +250,7 @@ export default function DirectSalesPage() {
                        <FormItem>
                           <FormLabel>Total Price</FormLabel>
                           <div className="relative">
-                            <span className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground">{shopSettings?.currencySymbol || '$'}</span>
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground">{currency}</span>
                             <Input 
                               type="number" 
                               value={form.getValues(`partsUsed.${index}.totalPrice`).toFixed(2)} 
@@ -293,7 +294,7 @@ export default function DirectSalesPage() {
                     <CardContent className="p-2 space-y-2">
                         <div className="flex justify-between items-center">
                             <span className="text-sm font-medium">Subtotal (Parts):</span>
-                            <span className="text-sm font-semibold">{shopSettings?.currencySymbol || '$'}{subTotalParts.toFixed(2)}</span>
+                            <span className="text-sm font-semibold">{currency}{subTotalParts.toFixed(2)}</span>
                         </div>
                         <FormField
                         control={form.control}
@@ -302,11 +303,11 @@ export default function DirectSalesPage() {
                             <FormItem className="flex justify-between items-center">
                             <FormLabel className="text-sm font-medium shrink-0 mr-2">Discount:</FormLabel>
                             <div className="relative w-32">
-                                <span className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground">{shopSettings?.currencySymbol || '$'}</span>
+                                <span className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground">{currency}</span>
                                 <Input 
                                 type="number" step="0.01" placeholder="0.00" {...field} 
                                 className="pl-6 h-8 text-sm" 
-                                value={field.value === undefined || field.value === null ? '' : field.value} // Ensure empty string for undefined
+                                value={field.value === undefined || field.value === null ? '' : field.value} 
                                 onChange={e => field.onChange(e.target.value === '' ? '' : parseFloat(e.target.value) || 0)} />
                             </div>
                             <FormMessage className="text-xs col-span-full" />
@@ -316,13 +317,13 @@ export default function DirectSalesPage() {
                          {shopSettings?.defaultTaxRate !== undefined && shopSettings.defaultTaxRate > 0 && (
                             <div className="flex justify-between items-center">
                                 <span className="text-sm font-medium">Tax ({shopSettings.defaultTaxRate}%):</span>
-                                <span className="text-sm font-semibold">{shopSettings?.currencySymbol || '$'}{taxAmount.toFixed(2)}</span>
+                                <span className="text-sm font-semibold">{currency}{taxAmount.toFixed(2)}</span>
                             </div>
                         )}
                         <Separator className="my-2"/>
                         <div className="flex justify-between items-center pt-1">
                             <span className="text-lg font-semibold text-primary">Grand Total:</span>
-                            <span className="text-xl font-bold text-primary">{shopSettings?.currencySymbol || '$'}{grandTotal.toFixed(2)}</span>
+                            <span className="text-xl font-bold text-primary">{currency}{grandTotal.toFixed(2)}</span>
                         </div>
                     </CardContent>
                 </Card>
@@ -374,7 +375,7 @@ export default function DirectSalesPage() {
                   Cancel Sale
                 </Button>
                 <Button type="submit" disabled={form.formState.isSubmitting || grandTotal < 0 || partFields.length === 0} size="lg">
-                  {form.formState.isSubmitting ? "Processing..." : `Complete Sale (${shopSettings?.currencySymbol || '$'}${grandTotal.toFixed(2)})`}
+                  {form.formState.isSubmitting ? "Processing..." : `Complete Sale (${currency}${grandTotal.toFixed(2)})`}
                 </Button>
               </div>
             </form>
@@ -384,4 +385,3 @@ export default function DirectSalesPage() {
     </div>
   );
 }
-

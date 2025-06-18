@@ -4,8 +4,8 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import type { JobOrder, Customer, Motorcycle, Mechanic, Payment } from "@/types";
-import { ArrowLeft, ClipboardList, DollarSign, Edit, Printer, Send, UserCog, PackageSearch, Wrench, CreditCard, PlusCircle } from "lucide-react";
+import type { JobOrder, Customer, Motorcycle, Mechanic, Payment, ShopSettings } from "@/types";
+import { ArrowLeft, ClipboardList, Edit, Printer, Send, UserCog, PackageSearch, Wrench, CreditCard, PlusCircle } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState, useMemo, useCallback } from "react";
@@ -17,14 +17,13 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { AddPaymentDialog } from "@/components/dashboard/job-orders/AddPaymentDialog";
 import { PAYMENT_STATUSES } from "@/lib/constants";
 
-// Initialize payment store if not already present
 if (typeof window !== 'undefined' && !(window as any).__paymentStore) {
     (window as any).__paymentStore = {
-        payments: [], // Start with an empty array
+        payments: [], 
         addPayment: (payment: Omit<Payment, 'id' | 'createdAt'>) => {
             const newPayment: Payment = {
                 ...payment,
-                id: String(Date.now() + Math.random()), // ensure more unique ID
+                id: String(Date.now() + Math.random()), 
                 createdAt: new Date(),
             };
             (window as any).__paymentStore.payments.push(newPayment);
@@ -33,7 +32,6 @@ if (typeof window !== 'undefined' && !(window as any).__paymentStore) {
         getPaymentsByJobOrderId: (jobOrderId: string) => {
             return (window as any).__paymentStore.payments.filter((p: Payment) => p.jobOrderId === jobOrderId);
         },
-        // Add deletePaymentById if it's needed for rollbacks or direct management
         deletePaymentById: (paymentId: string) => {
             (window as any).__paymentStore.payments = (window as any).__paymentStore.payments.filter((p: Payment) => p.id !== paymentId);
             return true;
@@ -55,7 +53,9 @@ export default function ViewJobOrderPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isMounted, setIsMounted] = useState(false);
   const [showAddPaymentDialog, setShowAddPaymentDialog] = useState(false);
-  const [shopSettings, setShopSettings] = useState<any>(null); // For currency symbol
+  const [shopSettings, setShopSettings] = useState<ShopSettings | null>(null); 
+
+  const currency = useMemo(() => shopSettings?.currencySymbol || '₱', [shopSettings]);
 
   const refreshJobOrderData = useCallback(() => {
     if (jobOrderId && isMounted) {
@@ -63,7 +63,7 @@ export default function ViewJobOrderPage() {
         let custData: Customer | undefined;
         let motoData: Motorcycle | undefined;
         let allMechanics: Mechanic[] = [];
-        let currentShopSettings: any = null;
+        let currentShopSettings: ShopSettings | null = null;
 
 
         if (typeof window !== 'undefined') {
@@ -89,7 +89,6 @@ export default function ViewJobOrderPage() {
         }
 
         if (joData) {
-            // The getJobOrderById from __jobOrderStore should now be consistently attaching payments
             setJobOrder(joData);
             setCustomer(custData || null);
             setMotorcycle(motoData || null);
@@ -125,7 +124,6 @@ export default function ViewJobOrderPage() {
     });
   };
   
-  const currency = useMemo(() => shopSettings?.currencySymbol || '$', [shopSettings]);
 
   const DetailItem = ({ label, value, className, isBadge = false, badgeVariant = "secondary" }: { label: string, value?: string | number | Date | null | React.ReactNode, className?: string, isBadge?: boolean, badgeVariant?: "default" | "secondary" | "destructive" | "outline" | null | undefined }) => {
     if (value === undefined || value === null || value === '') return null;
@@ -170,7 +168,7 @@ export default function ViewJobOrderPage() {
     return <div className="flex justify-center items-center h-screen"><p>Job order not found.</p></div>;
   }
   
-  const isFullyPaid = jobOrder.paymentStatus === PAYMENT_STATUSES.PAID || balanceDue <= 0.001; // Use small epsilon for float comparison
+  const isFullyPaid = jobOrder.paymentStatus === PAYMENT_STATUSES.PAID || balanceDue <= 0.001; 
 
   return (
     <div className="flex flex-col gap-6">
@@ -188,7 +186,7 @@ export default function ViewJobOrderPage() {
             <Button onClick={() => alert("Email functionality coming soon!")}>
                 <Send className="mr-2 h-4 w-4" /> Email to Customer
             </Button>
-            {jobOrder.status !== "Sale - Completed" && ( // Do not allow editing of "Sale - Completed"
+            {jobOrder.status !== "Sale - Completed" && ( 
                 <Button asChild>
                     <Link href={`/dashboard/job-orders/${jobOrder.id}/edit`}>
                         <Edit className="mr-2 h-4 w-4" /> Edit Job Order
@@ -416,4 +414,3 @@ export default function ViewJobOrderPage() {
     </div>
   );
 }
-

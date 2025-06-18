@@ -17,10 +17,10 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import Link from "next/link";
-import { ArrowLeft, ClipboardList, DollarSign, PlusCircle, Trash2 } from "lucide-react";
+import { ArrowLeft, ClipboardList, PlusCircle, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter, useParams } from "next/navigation";
-import type { JobOrder, Customer, Motorcycle, Service, Part, Mechanic, JobOrderServiceItem, JobOrderPartItem } from "@/types";
+import type { JobOrder, Customer, Motorcycle, Service, Part, Mechanic, JobOrderServiceItem, JobOrderPartItem, ShopSettings } from "@/types";
 import { useEffect, useState, useMemo } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DatePicker } from "@/components/ui/date-picker";
@@ -77,6 +77,9 @@ export default function EditJobOrderPage() {
   const [availableMechanics, setAvailableMechanics] = useState<Mechanic[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isMounted, setIsMounted] = useState(false);
+  const [shopSettings, setShopSettings] = useState<ShopSettings | null>(null);
+
+  const currency = useMemo(() => shopSettings?.currencySymbol || '₱', [shopSettings]);
 
   const form = useForm<JobOrderFormValues>({
     resolver: zodResolver(jobOrderFormSchema),
@@ -133,6 +136,7 @@ export default function EditJobOrderPage() {
       if ((window as any).__serviceStore) setAvailableServices((window as any).__serviceStore.services.filter((s: Service) => s.isActive));
       if ((window as any).__inventoryStore) setAvailableParts((window as any).__inventoryStore.parts.filter((p: Part) => p.isActive));
       if ((window as any).__mechanicStore) setAvailableMechanics((window as any).__mechanicStore.mechanics.filter((m: Mechanic) => m.isActive));
+      if ((window as any).__settingsStore) setShopSettings((window as any).__settingsStore.getSettings());
     }
   }, []);
 
@@ -195,7 +199,6 @@ export default function EditJobOrderPage() {
           ...existingJobOrder,
           ...data,
           discountAmount: data.discountAmount === '' ? undefined : Number(data.discountAmount),
-          // grandTotal will be recalculated in the store's update method
         };
         success = (window as any).__jobOrderStore.updateJobOrder(updatedJobOrderData);
       }
@@ -329,7 +332,6 @@ export default function EditJobOrderPage() {
                 )}
               />
               
-              {/* Services Performed Section */}
               <Separator />
               <div className="space-y-4">
                 <div className="flex justify-between items-center">
@@ -354,12 +356,12 @@ export default function EditJobOrderPage() {
                                 form.setValue(`servicesPerformed.${index}.serviceName`, selectedService?.name || "");
                                 form.setValue(`servicesPerformed.${index}.laborCost`, selectedService?.defaultLaborCost || 0);
                               }} 
-                              value={field.value} // ensure value is controlled
+                              value={field.value} 
                             >
                               <FormControl><SelectTrigger><SelectValue placeholder="Select a service" /></SelectTrigger></FormControl>
                               <SelectContent>
                                 {availableServices.map(service => (
-                                  <SelectItem key={service.id} value={service.id}>{service.name} (${service.defaultLaborCost.toFixed(2)})</SelectItem>
+                                  <SelectItem key={service.id} value={service.id}>{service.name} ({currency}{service.defaultLaborCost.toFixed(2)})</SelectItem>
                                 ))}
                               </SelectContent>
                             </Select>
@@ -375,7 +377,7 @@ export default function EditJobOrderPage() {
                             <FormLabel>Labor Cost</FormLabel>
                             <FormControl>
                               <div className="relative">
-                                <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                <span className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground">{currency}</span>
                                 <Input type="number" step="0.01" {...field} className="pl-8" onChange={e => field.onChange(parseFloat(e.target.value) || 0)} />
                               </div>
                             </FormControl>
@@ -435,7 +437,6 @@ export default function EditJobOrderPage() {
                   )}
                 />
 
-              {/* Parts Used Section */}
               <Separator />
               <div className="space-y-4">
                 <div className="flex justify-between items-center">
@@ -462,12 +463,12 @@ export default function EditJobOrderPage() {
                                 const qty = form.getValues(`partsUsed.${index}.quantity`) || 1;
                                 form.setValue(`partsUsed.${index}.totalPrice`, (selectedPart?.price || 0) * qty);
                               }} 
-                              value={field.value} // ensure value is controlled
+                              value={field.value} 
                             >
                               <FormControl><SelectTrigger><SelectValue placeholder="Select a part" /></SelectTrigger></FormControl>
                               <SelectContent>
                                 {availableParts.map(part => (
-                                  <SelectItem key={part.id} value={part.id}>{part.name} (Stock: {part.stockQuantity}, Price: ${part.price.toFixed(2)})</SelectItem>
+                                  <SelectItem key={part.id} value={part.id}>{part.name} (Stock: {part.stockQuantity}, Price: {currency}{part.price.toFixed(2)})</SelectItem>
                                 ))}
                               </SelectContent>
                             </Select>
@@ -484,6 +485,7 @@ export default function EditJobOrderPage() {
                             <FormControl>
                               <Input 
                                 type="number" 
+                                min="1"
                                 {...field} 
                                 onChange={e => {
                                   const qty = parseInt(e.target.value, 10) || 0;
@@ -500,7 +502,7 @@ export default function EditJobOrderPage() {
                        <FormItem>
                           <FormLabel>Total Price</FormLabel>
                           <div className="relative">
-                            <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground">{currency}</span>
                             <Input 
                               type="number" 
                               value={form.getValues(`partsUsed.${index}.totalPrice`).toFixed(2)} 
@@ -537,11 +539,11 @@ export default function EditJobOrderPage() {
                 <CardContent className="p-2 space-y-2">
                     <div className="flex justify-between items-center">
                         <span className="text-sm font-medium">Total Labor Cost:</span>
-                        <span className="text-sm font-semibold">${totalLaborCost.toFixed(2)}</span>
+                        <span className="text-sm font-semibold">{currency}{totalLaborCost.toFixed(2)}</span>
                     </div>
                     <div className="flex justify-between items-center">
                         <span className="text-sm font-medium">Total Parts Cost:</span>
-                        <span className="text-sm font-semibold">${totalPartsCost.toFixed(2)}</span>
+                        <span className="text-sm font-semibold">{currency}{totalPartsCost.toFixed(2)}</span>
                     </div>
                     <FormField
                       control={form.control}
@@ -550,7 +552,7 @@ export default function EditJobOrderPage() {
                         <FormItem className="flex justify-between items-center">
                           <FormLabel className="text-sm font-medium">Discount Amount:</FormLabel>
                           <div className="relative w-32">
-                            <DollarSign className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
+                            <span className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground">{currency}</span>
                             <Input 
                               type="number" step="0.01" placeholder="0.00" {...field} 
                               className="pl-6 h-8 text-sm" 
@@ -567,7 +569,7 @@ export default function EditJobOrderPage() {
                 <CardContent className="p-4">
                     <div className="flex justify-between items-center">
                         <span className="text-lg font-semibold">Grand Total:</span>
-                        <span className="text-2xl font-bold text-primary">${grandTotal.toFixed(2)}</span>
+                        <span className="text-2xl font-bold text-primary">{currency}{grandTotal.toFixed(2)}</span>
                     </div>
                 </CardContent>
               </Card>

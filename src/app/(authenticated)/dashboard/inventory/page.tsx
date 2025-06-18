@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PlusCircle, Package, Pencil, Trash2, Download, Upload } from "lucide-react";
@@ -25,7 +25,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
-import type { Part } from "@/types";
+import type { Part, ShopSettings } from "@/types";
 import { Badge } from "@/components/ui/badge";
 
 const initialParts: Part[] = [
@@ -85,7 +85,7 @@ if (typeof window !== 'undefined') {
       addPart: (part: Omit<Part, 'id' | 'createdAt' | 'updatedAt'>) => {
         const newPart: Part = {
           ...part,
-          id: String(Date.now() + Math.random()), // Ensure more unique ID
+          id: String(Date.now() + Math.random()), 
           createdAt: new Date(),
           updatedAt: new Date(),
         };
@@ -118,11 +118,19 @@ export default function InventoryPage() {
   const [partToDelete, setPartToDelete] = useState<Part | null>(null);
   const [isMounted, setIsMounted] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [shopSettings, setShopSettings] = useState<ShopSettings | null>(null);
+
+  const currency = useMemo(() => shopSettings?.currencySymbol || '₱', [shopSettings]);
 
   useEffect(() => {
     setIsMounted(true);
-    if (typeof window !== 'undefined' && (window as any).__inventoryStore) {
-      setParts([...(window as any).__inventoryStore.parts]);
+    if (typeof window !== 'undefined') {
+      if ((window as any).__inventoryStore) {
+        setParts([...(window as any).__inventoryStore.parts]);
+      }
+      if ((window as any).__settingsStore) {
+        setShopSettings((window as any).__settingsStore.getSettings());
+      }
     }
   }, []);
 
@@ -183,7 +191,7 @@ export default function InventoryPage() {
         if (value instanceof Date) {
           value = value.toISOString();
         } else if (typeof value === 'string' && value.includes(',')) {
-          value = `"${value}"`; // Enclose in quotes if it contains a comma
+          value = `"${value}"`; 
         } else if (value === undefined || value === null) {
           value = "";
         }
@@ -221,7 +229,6 @@ export default function InventoryPage() {
         return;
       }
 
-      // Define expected headers and their mapping to Part keys
       const headerLine = lines[0].split(',').map(h => h.trim().toLowerCase());
       const expectedPartHeaders: Record<string, { key: keyof Omit<Part, 'id' | 'createdAt' | 'updatedAt'>, type: 'string' | 'number' | 'integer' | 'boolean', optional?: boolean }> = {
         'name': { key: 'name', type: 'string' },
@@ -237,7 +244,6 @@ export default function InventoryPage() {
         'isactive': { key: 'isActive', type: 'boolean' },
       };
       
-      // Create a map of CSV header index to Part key and type
       const headerMap: { index: number, targetKey: keyof Omit<Part, 'id' | 'createdAt' | 'updatedAt'>, type: 'string' | 'number' | 'integer' | 'boolean', optional?: boolean }[] = [];
       headerLine.forEach((header, index) => {
         const mapping = expectedPartHeaders[header];
@@ -256,9 +262,9 @@ export default function InventoryPage() {
 
       for (let i = 1; i < lines.length; i++) {
         const line = lines[i];
-        if (!line.trim()) continue; // Skip empty lines
+        if (!line.trim()) continue; 
 
-        const values = line.split(','); // Simple split, might need more robust parsing for quoted fields
+        const values = line.split(','); 
         
         const partData: Partial<Omit<Part, 'id' | 'createdAt' | 'updatedAt'>> = {};
         let rowIsValid = true;
@@ -267,8 +273,6 @@ export default function InventoryPage() {
             const valueStr = values[mapping.index]?.trim();
             if (valueStr === undefined || valueStr === "") {
                 if (!mapping.optional) {
-                     // console.warn(`Missing non-optional value for ${mapping.targetKey} in row ${i+1}`);
-                    // rowIsValid = false; // Allow optional if not explicitly required
                 }
                 partData[mapping.targetKey] = undefined;
                 return;
@@ -301,12 +305,10 @@ export default function InventoryPage() {
                         break;
                 }
             } catch (err: any) {
-                // console.error(`Error parsing row ${i+1}, column ${mapping.targetKey}: ${err.message}`);
                 rowIsValid = false;
             }
         });
 
-        // Ensure required fields after potential undefined settings from loop
         if (partData.name === undefined || partData.price === undefined || partData.stockQuantity === undefined || partData.isActive === undefined) {
             rowIsValid = false;
         }
@@ -331,7 +333,7 @@ export default function InventoryPage() {
     };
     reader.readAsText(file);
     if(fileInputRef.current) {
-        fileInputRef.current.value = ""; // Reset file input
+        fileInputRef.current.value = ""; 
     }
   };
   
@@ -393,7 +395,7 @@ export default function InventoryPage() {
                     <TableCell>{part.sku || "-"}</TableCell>
                     <TableCell>{part.brand || "-"}</TableCell>
                     <TableCell>{part.category || "-"}</TableCell>
-                    <TableCell className="text-right">${part.price.toFixed(2)}</TableCell>
+                    <TableCell className="text-right">{currency}{part.price.toFixed(2)}</TableCell>
                     <TableCell className="text-right">{part.stockQuantity}</TableCell>
                     <TableCell>
                       <Badge variant={part.isActive ? "default" : "secondary"}>
@@ -450,5 +452,3 @@ export default function InventoryPage() {
     </div>
   );
 }
-
-    

@@ -17,10 +17,10 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import Link from "next/link";
-import { ArrowLeft, ClipboardList, DollarSign, PlusCircle, Trash2 } from "lucide-react";
+import { ArrowLeft, ClipboardList, PlusCircle, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
-import type { JobOrder, Customer, Motorcycle, Service, Part, Mechanic } from "@/types";
+import type { JobOrder, Customer, Motorcycle, Service, Part, Mechanic, ShopSettings } from "@/types";
 import { useEffect, useState, useMemo } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DatePicker } from "@/components/ui/date-picker";
@@ -30,7 +30,7 @@ import { Separator } from "@/components/ui/separator";
 const jobOrderServiceItemSchema = z.object({
   id: z.string(),
   serviceId: z.string().min(1, "Service selection is required."),
-  serviceName: z.string(), // Will be auto-filled
+  serviceName: z.string(), 
   laborCost: z.coerce.number().min(0, "Labor cost must be non-negative."),
   assignedMechanicId: z.string().optional(),
   notes: z.string().optional(),
@@ -39,10 +39,10 @@ const jobOrderServiceItemSchema = z.object({
 const jobOrderPartItemSchema = z.object({
   id: z.string(),
   partId: z.string().min(1, "Part selection is required."),
-  partName: z.string(), // Will be auto-filled
+  partName: z.string(), 
   quantity: z.coerce.number().int().min(1, "Quantity must be at least 1."),
-  pricePerUnit: z.coerce.number().min(0), // Auto-filled
-  totalPrice: z.coerce.number().min(0), // Auto-calculated
+  pricePerUnit: z.coerce.number().min(0), 
+  totalPrice: z.coerce.number().min(0), 
 });
 
 
@@ -58,7 +58,6 @@ const jobOrderFormSchema = z.object({
   discountAmount: z.coerce.number().min(0, "Discount must be non-negative.").optional().or(z.literal('')),
   estimatedCompletionDate: z.date().optional(),
   paymentStatus: z.enum(PAYMENT_STATUS_OPTIONS),
-  // Legacy fields for notes, can be removed if not needed
   servicesDescription: z.string().max(1000).optional().or(z.literal('')),
   partsDescription: z.string().max(1000).optional().or(z.literal('')),
 });
@@ -74,6 +73,9 @@ export default function NewJobOrderPage() {
   const [availableParts, setAvailableParts] = useState<Part[]>([]);
   const [availableMechanics, setAvailableMechanics] = useState<Mechanic[]>([]);
   const [isMounted, setIsMounted] = useState(false);
+  const [shopSettings, setShopSettings] = useState<ShopSettings | null>(null);
+
+  const currency = useMemo(() => shopSettings?.currencySymbol || '₱', [shopSettings]);
 
   const form = useForm<JobOrderFormValues>({
     resolver: zodResolver(jobOrderFormSchema),
@@ -129,6 +131,7 @@ export default function NewJobOrderPage() {
       if ((window as any).__serviceStore) setAvailableServices((window as any).__serviceStore.services.filter((s: Service) => s.isActive));
       if ((window as any).__inventoryStore) setAvailableParts((window as any).__inventoryStore.parts.filter((p: Part) => p.isActive));
       if ((window as any).__mechanicStore) setAvailableMechanics((window as any).__mechanicStore.mechanics.filter((m: Mechanic) => m.isActive));
+      if ((window as any).__settingsStore) setShopSettings((window as any).__settingsStore.getSettings());
     }
   }, []);
 
@@ -197,7 +200,6 @@ export default function NewJobOrderPage() {
         <CardContent>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-              {/* Customer and Motorcycle Selection */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <FormField
                   control={form.control}
@@ -250,7 +252,6 @@ export default function NewJobOrderPage() {
                 />
               </div>
 
-              {/* Status and Diagnostics */}
               <FormField
                 control={form.control}
                 name="status"
@@ -287,7 +288,6 @@ export default function NewJobOrderPage() {
                 )}
               />
 
-              {/* Services Performed Section */}
               <Separator />
               <div className="space-y-4">
                 <div className="flex justify-between items-center">
@@ -317,7 +317,7 @@ export default function NewJobOrderPage() {
                               <FormControl><SelectTrigger><SelectValue placeholder="Select a service" /></SelectTrigger></FormControl>
                               <SelectContent>
                                 {availableServices.map(service => (
-                                  <SelectItem key={service.id} value={service.id}>{service.name} (${service.defaultLaborCost.toFixed(2)})</SelectItem>
+                                  <SelectItem key={service.id} value={service.id}>{service.name} ({currency}{service.defaultLaborCost.toFixed(2)})</SelectItem>
                                 ))}
                               </SelectContent>
                             </Select>
@@ -333,7 +333,7 @@ export default function NewJobOrderPage() {
                             <FormLabel>Labor Cost</FormLabel>
                             <FormControl>
                               <div className="relative">
-                                <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                <span className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground">{currency}</span>
                                 <Input type="number" step="0.01" {...field} className="pl-8" onChange={e => field.onChange(parseFloat(e.target.value) || 0)} />
                               </div>
                             </FormControl>
@@ -394,7 +394,6 @@ export default function NewJobOrderPage() {
                 />
 
 
-              {/* Parts Used Section */}
               <Separator />
               <div className="space-y-4">
                 <div className="flex justify-between items-center">
@@ -426,7 +425,7 @@ export default function NewJobOrderPage() {
                               <FormControl><SelectTrigger><SelectValue placeholder="Select a part" /></SelectTrigger></FormControl>
                               <SelectContent>
                                 {availableParts.map(part => (
-                                  <SelectItem key={part.id} value={part.id}>{part.name} (Stock: {part.stockQuantity}, Price: ${part.price.toFixed(2)})</SelectItem>
+                                  <SelectItem key={part.id} value={part.id}>{part.name} (Stock: {part.stockQuantity}, Price: {currency}{part.price.toFixed(2)})</SelectItem>
                                 ))}
                               </SelectContent>
                             </Select>
@@ -443,6 +442,7 @@ export default function NewJobOrderPage() {
                             <FormControl>
                               <Input 
                                 type="number" 
+                                min="1"
                                 {...field} 
                                 onChange={e => {
                                   const qty = parseInt(e.target.value, 10) || 0;
@@ -459,7 +459,7 @@ export default function NewJobOrderPage() {
                        <FormItem>
                           <FormLabel>Total Price</FormLabel>
                           <div className="relative">
-                            <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground">{currency}</span>
                             <Input 
                               type="number" 
                               value={form.getValues(`partsUsed.${index}.totalPrice`).toFixed(2)} 
@@ -490,18 +490,17 @@ export default function NewJobOrderPage() {
                   )}
                 />
 
-              {/* Cost Summary */}
               <Separator />
                <Card className="bg-muted/20 p-2">
                 <CardHeader className="p-2 pb-0"><CardTitle className="text-lg">Cost Calculation</CardTitle></CardHeader>
                 <CardContent className="p-2 space-y-2">
                     <div className="flex justify-between items-center">
                         <span className="text-sm font-medium">Total Labor Cost:</span>
-                        <span className="text-sm font-semibold">${totalLaborCost.toFixed(2)}</span>
+                        <span className="text-sm font-semibold">{currency}{totalLaborCost.toFixed(2)}</span>
                     </div>
                     <div className="flex justify-between items-center">
                         <span className="text-sm font-medium">Total Parts Cost:</span>
-                        <span className="text-sm font-semibold">${totalPartsCost.toFixed(2)}</span>
+                        <span className="text-sm font-semibold">{currency}{totalPartsCost.toFixed(2)}</span>
                     </div>
                     <FormField
                       control={form.control}
@@ -510,7 +509,7 @@ export default function NewJobOrderPage() {
                         <FormItem className="flex justify-between items-center">
                           <FormLabel className="text-sm font-medium">Discount Amount:</FormLabel>
                           <div className="relative w-32">
-                            <DollarSign className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
+                            <span className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground">{currency}</span>
                             <Input 
                               type="number" step="0.01" placeholder="0.00" {...field} 
                               className="pl-6 h-8 text-sm" 
@@ -527,13 +526,12 @@ export default function NewJobOrderPage() {
                 <CardContent className="p-4">
                     <div className="flex justify-between items-center">
                         <span className="text-lg font-semibold">Grand Total:</span>
-                        <span className="text-2xl font-bold text-primary">${grandTotal.toFixed(2)}</span>
+                        <span className="text-2xl font-bold text-primary">{currency}{grandTotal.toFixed(2)}</span>
                     </div>
                 </CardContent>
               </Card>
 
 
-              {/* Dates and Payment */}
               <Separator />
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <FormField
@@ -590,6 +588,3 @@ export default function NewJobOrderPage() {
     </div>
   );
 }
-
-
-    

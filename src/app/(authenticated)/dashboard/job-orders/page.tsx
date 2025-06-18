@@ -25,17 +25,16 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
-import type { JobOrder, Customer, Motorcycle, Part, Service, Payment, PaymentMethod } from "@/types";
+import type { JobOrder, Customer, Motorcycle, Part, Service, Payment, PaymentMethod, ShopSettings } from "@/types";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { PAYMENT_STATUSES, JOB_ORDER_STATUSES } from "@/lib/constants";
 
-// Initial mock data for job orders
 const initialJobOrders: JobOrder[] = [
   {
     id: "jo1",
-    customerId: "1", // John Doe
-    motorcycleId: "m1", // Honda CBR600RR
+    customerId: "1", 
+    motorcycleId: "m1", 
     status: JOB_ORDER_STATUSES.IN_PROGRESS,
     servicesPerformed: [
       { id: "jos1", serviceId: "svc1", serviceName: "Oil Change", laborCost: 50, assignedMechanicId: "mech1" }
@@ -45,7 +44,7 @@ const initialJobOrders: JobOrder[] = [
     ],
     servicesDescription: "Standard oil change, chain lubrication.", 
     partsDescription: "Oil filter, 4L synthetic oil.", 
-    taxAmount: 4.69, // Assuming 7.5% of (50+12.50)
+    taxAmount: 4.69, 
     grandTotal: 67.19, 
     paymentStatus: PAYMENT_STATUSES.UNPAID,
     amountPaid: 0,
@@ -57,8 +56,8 @@ const initialJobOrders: JobOrder[] = [
   },
   {
     id: "jo2",
-    customerId: "2", // Jane Smith
-    motorcycleId: "m2", // Yamaha MT-07
+    customerId: "2", 
+    motorcycleId: "m2", 
     status: JOB_ORDER_STATUSES.COMPLETED,
     servicesPerformed: [
       { id: "jos2", serviceId: "svc2", serviceName: "Tire Replacement", laborCost: 150, assignedMechanicId: "mech2" }
@@ -68,7 +67,7 @@ const initialJobOrders: JobOrder[] = [
       { id: "jop3", partId: "someTirePartId2", partName: "Pirelli Diablo Rosso III (Rear)", quantity: 1, pricePerUnit: 175, totalPrice: 175 }
     ],
     servicesDescription: "Tire replacement (front and rear), brake fluid flush.",
-    taxAmount: 37.50, // Assuming 7.5% of (150+175+175)
+    taxAmount: 37.50, 
     grandTotal: 537.50, 
     paymentStatus: PAYMENT_STATUSES.PAID,
     amountPaid: 537.50,
@@ -88,7 +87,6 @@ type AddJobOrderInput = Omit<JobOrder, 'id' | 'createdAt' | 'updatedAt' | 'creat
 };
 
 
-// In-memory store for job orders
 if (typeof window !== 'undefined') {
   if (!(window as any).__jobOrderStore) {
     (window as any).__jobOrderStore = {
@@ -107,7 +105,7 @@ if (typeof window !== 'undefined') {
 
         const newJobOrder: JobOrder = {
           ...jobOrderData,
-          id: String(Date.now()), // Simple ID generation
+          id: String(Date.now()), 
           servicesPerformed: jobOrderData.servicesPerformed || [],
           partsUsed: jobOrderData.partsUsed || [],
           taxAmount: calculatedTaxAmount,
@@ -138,7 +136,6 @@ if (typeof window !== 'undefined') {
 
         (window as any).__jobOrderStore.jobOrders.push(newJobOrder);
 
-        // Deduct inventory
         if ((window as any).__inventoryStore) {
           newJobOrder.partsUsed.forEach(item => {
             const partIndex = (window as any).__inventoryStore.parts.findIndex((p: Part) => p.id === item.partId);
@@ -216,7 +213,6 @@ if (typeof window !== 'undefined') {
       },
       getJobOrderById: (jobOrderId: string) => {
         const jobOrder = (window as any).__jobOrderStore.jobOrders.find((jo: JobOrder) => jo.id === jobOrderId);
-        // Ensure payment history is attached if payments exist in paymentStore
         if (jobOrder && (window as any).__paymentStore) {
             const payments = (window as any).__paymentStore.getPaymentsByJobOrderId(jobOrder.id);
             jobOrder.paymentHistory = payments;
@@ -231,12 +227,10 @@ if (typeof window !== 'undefined') {
         const joIndex = (window as any).__jobOrderStore.jobOrders.findIndex((jo: JobOrder) => jo.id === jobOrderId);
         if (joIndex !== -1) {
           const jobOrder = (window as any).__jobOrderStore.jobOrders[joIndex];
-          // Check if this exact payment ID already exists to prevent duplicates if this function is somehow called twice with the same payment object
           if (!jobOrder.paymentHistory.find(p => p.id === payment.id)) {
             jobOrder.paymentHistory.push(payment);
             jobOrder.amountPaid += payment.amount;
           } else {
-            // If payment already exists, ensure amountPaid is correct (e.g. after page refresh and re-fetching)
             jobOrder.amountPaid = jobOrder.paymentHistory.reduce((sum: number, p: Payment) => sum + p.amount, 0);
           }
           
@@ -262,16 +256,18 @@ export default function JobOrdersPage() {
   const [jobOrders, setJobOrders] = useState<JobOrder[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [motorcycles, setMotorcycles] = useState<Motorcycle[]>([]);
+  const [shopSettings, setShopSettings] = useState<ShopSettings | null>(null);
   
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [jobOrderToDelete, setJobOrderToDelete] = useState<JobOrder | null>(null);
   const [isMounted, setIsMounted] = useState(false);
 
+  const currency = useMemo(() => shopSettings?.currencySymbol || '₱', [shopSettings]);
+
   useEffect(() => {
     setIsMounted(true);
     if (typeof window !== 'undefined') {
       if ((window as any).__jobOrderStore) {
-        // Ensure each job order has its payment data refreshed from __paymentStore when listed
         const ordersFromStore = (window as any).__jobOrderStore.jobOrders.map((jo: JobOrder) => {
             if ((window as any).__paymentStore) {
                 const payments = (window as any).__paymentStore.getPaymentsByJobOrderId(jo.id);
@@ -290,6 +286,9 @@ export default function JobOrdersPage() {
       }
       if ((window as any).__motorcycleStore) { 
         setMotorcycles([...(window as any).__motorcycleStore.motorcycles]);
+      }
+      if ((window as any).__settingsStore) {
+        setShopSettings((window as any).__settingsStore.getSettings());
       }
     }
   }, []);
@@ -317,7 +316,7 @@ export default function JobOrdersPage() {
                 let paymentStatus = PAYMENT_STATUSES.UNPAID;
                 if (amountPaid >= jo.grandTotal && jo.grandTotal > 0) paymentStatus = PAYMENT_STATUSES.PAID;
                 else if (amountPaid > 0) paymentStatus = PAYMENT_STATUSES.PARTIAL;
-                else if (jo.grandTotal === 0 && amountPaid === 0) paymentStatus = PAYMENT_STATUSES.PAID; // Consider $0 orders paid
+                else if (jo.grandTotal === 0 && amountPaid === 0) paymentStatus = PAYMENT_STATUSES.PAID; 
                 return {...jo, paymentHistory: payments, amountPaid, paymentStatus};
             }
             return jo;
@@ -331,7 +330,6 @@ export default function JobOrdersPage() {
     const interval = setInterval(() => {
       if (typeof window !== 'undefined' && (window as any).__jobOrderStore) {
         const storeJobOrdersRaw = (window as any).__jobOrderStore.jobOrders;
-         // Deep comparison or a version flag would be better, but for now, stringify is a simple check
         if (JSON.stringify(storeJobOrdersRaw.map((jo:JobOrder) => ({id: jo.id, updatedAt: jo.updatedAt, amountPaid: jo.amountPaid}))) !== JSON.stringify(jobOrders.map(jo => ({id: jo.id, updatedAt: jo.updatedAt, amountPaid: jo.amountPaid})))) {
           refreshJobOrders();
         }
@@ -349,7 +347,6 @@ export default function JobOrdersPage() {
     if (jobOrderToDelete) {
       if (typeof window !== 'undefined' && (window as any).__jobOrderStore) {
         (window as any).__jobOrderStore.deleteJobOrder(jobOrderToDelete.id);
-        // Also delete associated payments from __paymentStore
         if ((window as any).__paymentStore && jobOrderToDelete.paymentHistory) {
             jobOrderToDelete.paymentHistory.forEach(p => (window as any).__paymentStore.deletePaymentById?.(p.id));
         }
@@ -408,7 +405,7 @@ export default function JobOrdersPage() {
                     <TableCell>{jo.motorcycleId ? motorcycleMap.get(jo.motorcycleId) || "N/A" : (jo.status === JOB_ORDER_STATUSES.SALE_COMPLETED ? "Direct Sale" : "N/A")}</TableCell>
                     <TableCell><Badge variant={jo.status === JOB_ORDER_STATUSES.COMPLETED || jo.status === JOB_ORDER_STATUSES.SALE_COMPLETED ? "default" : "secondary"}>{jo.status}</Badge></TableCell>
                     <TableCell><Badge variant={jo.paymentStatus === PAYMENT_STATUSES.PAID ? "default" : (jo.paymentStatus === PAYMENT_STATUSES.UNPAID ? "destructive" : "secondary") }>{jo.paymentStatus}</Badge></TableCell>
-                    <TableCell className="text-right">${(Number(jo.grandTotal) || 0).toFixed(2)}</TableCell>
+                    <TableCell className="text-right">{currency}{(Number(jo.grandTotal) || 0).toFixed(2)}</TableCell>
                     <TableCell>{format(new Date(jo.createdAt), "MMM dd, yyyy")}</TableCell>
                     <TableCell className="text-right space-x-1">
                       <Button variant="ghost" size="icon" asChild className="hover:text-primary">
@@ -469,4 +466,3 @@ export default function JobOrdersPage() {
     </div>
   );
 }
-

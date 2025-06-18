@@ -51,14 +51,14 @@ type SettingsFormValues = z.infer<typeof settingsFormSchema>;
 
 const initialSettings: ShopSettings = {
   shopName: "TorqueTrack Workshop",
-  shopAddress: "123 Main Street, Anytown, USA 12345",
-  shopPhone: "555-123-4567",
-  shopEmail: "contact@torquetrack.com",
+  shopAddress: "123 Main Street, Anytown, Philippines 12345",
+  shopPhone: "0917-123-4567",
+  shopEmail: "contact@torquetrack.ph",
   shopLogoUrl: "",
-  currencySymbol: "$",
-  defaultTaxRate: 7.5,
-  defaultLaborRate: 75,
-  theme: 'dark', // Default to dark theme
+  currencySymbol: "₱", // Changed to Peso
+  defaultTaxRate: 12, // Example VAT
+  defaultLaborRate: 500, // Example labor rate in Peso
+  theme: 'dark', 
   moduleSettings: {
     reportsEnabled: true,
     directSalesEnabled: true,
@@ -75,7 +75,7 @@ if (typeof window !== 'undefined') {
         (window as any).__settingsStore.settings = {
           ...(window as any).__settingsStore.settings,
           ...newSettings,
-          moduleSettings: { // Deep merge module settings
+          moduleSettings: { 
             ...(window as any).__settingsStore.settings.moduleSettings,
             ...newSettings.moduleSettings,
           },
@@ -100,7 +100,7 @@ export default function SettingsPage() {
       shopPhone: "",
       shopEmail: "",
       shopLogoUrl: "",
-      currencySymbol: "$",
+      currencySymbol: "₱", // Default to Peso in form
       defaultTaxRate: undefined,
       defaultLaborRate: undefined,
       theme: 'dark',
@@ -122,12 +122,10 @@ export default function SettingsPage() {
 
   useEffect(() => {
     setIsMounted(true);
-    // Apply theme from localStorage on initial mount
     const storedTheme = localStorage.getItem('theme') as 'light' | 'dark' | null;
     if (storedTheme) {
       applyTheme(storedTheme);
     } else {
-      // If no theme in localStorage, apply default from initialSettings and save it
       applyTheme(initialSettings.theme);
     }
   }, [applyTheme]);
@@ -159,7 +157,7 @@ export default function SettingsPage() {
             directSalesEnabled: currentSettings.moduleSettings?.directSalesEnabled ?? true,
           },
         });
-      } else { // Fallback to initial if store somehow not ready
+      } else { 
          form.reset({
           ...initialSettings,
           defaultTaxRate: initialSettings.defaultTaxRate === undefined ? '' : initialSettings.defaultTaxRate,
@@ -186,12 +184,12 @@ export default function SettingsPage() {
         ...data,
         defaultTaxRate: data.defaultTaxRate === '' ? undefined : Number(data.defaultTaxRate),
         defaultLaborRate: data.defaultLaborRate === '' ? undefined : Number(data.defaultLaborRate),
-        moduleSettings: data.moduleSettings, // Pass the nested object
+        moduleSettings: data.moduleSettings,
       });
     }
 
     if (updatedSettings) {
-      applyTheme(updatedSettings.theme); // Ensure theme is applied from saved settings
+      applyTheme(updatedSettings.theme); 
       toast({
         title: "Settings Saved",
         description: "Your shop settings have been successfully updated.",
@@ -326,7 +324,7 @@ export default function SettingsPage() {
                         <FormItem>
                           <FormLabel>Currency Symbol</FormLabel>
                           <FormControl>
-                            <Input placeholder="$" {...field} />
+                            <Input placeholder="₱" {...field} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -339,7 +337,7 @@ export default function SettingsPage() {
                         <FormItem>
                           <FormLabel>Default Tax Rate (%) (Optional)</FormLabel>
                           <FormControl>
-                            <Input type="number" step="0.01" placeholder="e.g., 7.5" {...field} onChange={e => field.onChange(e.target.value === '' ? '' : parseFloat(e.target.value) || 0)} />
+                            <Input type="number" step="0.01" placeholder="e.g., 12" {...field} onChange={e => field.onChange(e.target.value === '' ? '' : parseFloat(e.target.value) || 0)} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -350,9 +348,9 @@ export default function SettingsPage() {
                       name="defaultLaborRate"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Default Labor Rate ($/hr) (Optional)</FormLabel>
+                          <FormLabel>Default Labor Rate (₱/hr) (Optional)</FormLabel>
                           <FormControl>
-                            <Input type="number" step="0.01" placeholder="e.g., 75" {...field} onChange={e => field.onChange(e.target.value === '' ? '' : parseFloat(e.target.value) || 0)} />
+                            <Input type="number" step="0.01" placeholder="e.g., 500" {...field} onChange={e => field.onChange(e.target.value === '' ? '' : parseFloat(e.target.value) || 0)} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>

@@ -20,8 +20,8 @@ import Link from "next/link";
 import { ArrowLeft, Wrench } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter, useParams } from "next/navigation";
-import type { Service } from "@/types";
-import { useEffect, useState } from "react";
+import type { Service, ShopSettings } from "@/types";
+import { useEffect, useState, useMemo } from "react";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { COMMISSION_TYPES, COMMISSION_TYPE_OPTIONS } from "@/lib/constants";
@@ -40,7 +40,6 @@ const serviceFormSchema = z.object({
     return false;
   }
   if (!data.commissionType && (data.commissionValue !== undefined && data.commissionValue !== '')) {
-     // If commission type is not set, commission value should also not be set (or be empty/undefined)
     return false;
   }
   return true;
@@ -59,6 +58,9 @@ export default function EditServicePage() {
   
   const [isLoading, setIsLoading] = useState(true);
   const [isMounted, setIsMounted] = useState(false);
+  const [shopSettings, setShopSettings] = useState<ShopSettings | null>(null);
+
+  const currency = useMemo(() => shopSettings?.currencySymbol || '₱', [shopSettings]);
 
   const form = useForm<ServiceFormValues>({
     resolver: zodResolver(serviceFormSchema),
@@ -78,6 +80,9 @@ export default function EditServicePage() {
 
   useEffect(() => {
     setIsMounted(true);
+    if (typeof window !== 'undefined' && (window as any).__settingsStore) {
+      setShopSettings((window as any).__settingsStore.getSettings());
+    }
   }, []);
 
   useEffect(() => {
@@ -225,9 +230,9 @@ export default function EditServicePage() {
                   name="defaultLaborCost"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Default Labor Cost ($)</FormLabel>
+                      <FormLabel>Default Labor Cost ({currency})</FormLabel>
                       <FormControl>
-                        <Input type="number" placeholder="e.g., 75.00" {...field} onChange={e => field.onChange(parseFloat(e.target.value) || 0)} />
+                        <Input type="number" placeholder="e.g., 2500.00" {...field} onChange={e => field.onChange(parseFloat(e.target.value) || 0)} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -279,12 +284,12 @@ export default function EditServicePage() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>
-                          Commission Value {commissionType === COMMISSION_TYPES.PERCENTAGE ? "(%)" : "($)"}
+                          Commission Value {commissionType === COMMISSION_TYPES.PERCENTAGE ? "(%)" : `(${currency})`}
                         </FormLabel>
                         <FormControl>
                           <Input 
                             type="number" 
-                            placeholder={commissionType === COMMISSION_TYPES.PERCENTAGE ? "e.g., 10" : "e.g., 5.00"}
+                            placeholder={commissionType === COMMISSION_TYPES.PERCENTAGE ? "e.g., 10" : "e.g., 250.00"}
                             {...field} 
                             onChange={e => field.onChange(e.target.value === '' ? '' : parseFloat(e.target.value) || 0)} 
                           />
