@@ -95,7 +95,6 @@ export interface JobOrder {
   servicesPerformed: JobOrderServiceItem[]; 
   partsUsed: JobOrderPartItem[];          
 
-  // Optional legacy fields, can be phased out or used for additional notes
   servicesDescription?: string; 
   partsDescription?: string;    
 
@@ -104,13 +103,9 @@ export interface JobOrder {
   estimatedCompletionDate?: Date;
   actualCompletionDate?: Date;
   
-  // These will be calculated from servicesPerformed and partsUsed sums
-  // totalLaborCost: number; 
-  // totalPartsCost: number;
-  
   discountAmount?: number;
-  taxAmount?: number; // Keep for future tax calculation
-  grandTotal: number; // Calculated: sum(services) + sum(parts) - discount + tax
+  taxAmount?: number; 
+  grandTotal: number;
   
   paymentStatus: PaymentStatus;
   createdAt: Date;
@@ -135,4 +130,14 @@ export interface Payment {
   paymentMethod: string; 
   notes?: string;
   processedByUserId: string;
+}
+
+export interface ShopSettings {
+  shopName: string;
+  shopAddress?: string;
+  shopPhone?: string;
+  shopEmail?: string;
+  currencySymbol: string; 
+  defaultTaxRate?: number; // as a percentage, e.g., 10 for 10%
+  updatedAt?: Date;
 }
