@@ -23,10 +23,10 @@ import { useRouter, useSearchParams } from "next/navigation";
 import type { PurchaseOrder, PurchaseOrderItem, Supplier, ShopSettings, PurchaseRequisition, Part } from "@/types";
 import { useEffect, useState, useMemo, useCallback } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Combobox, type ComboboxOption } from "@/components/ui/combobox"; // Updated import
+import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
 import { Separator } from "@/components/ui/separator";
 import { DatePicker } from "@/components/ui/date-picker";
-import { PURCHASE_ORDER_STATUSES } from "@/lib/constants";
+import { PURCHASE_ORDER_STATUSES, PURCHASE_REQUISITION_STATUSES } from "@/lib/constants";
 
 const purchaseOrderItemSchema = z.object({
   id: z.string(), 
@@ -55,11 +55,12 @@ const purchaseOrderFormSchema = z.object({
 }).refine(data => {
   return data.items.every(item => {
       const calculatedTotalPrice = item.quantity * item.unitPrice;
+      // Use a small epsilon for floating point comparison
       return Math.abs(calculatedTotalPrice - item.totalPrice) < 0.001; 
   });
 }, {
   message: "Total price must match quantity * unit price for each item.",
-  path: ["items"],
+  path: ["items"], // You might want to target specific item's totalPrice field
 });
 
 type PurchaseOrderFormValues = z.infer<typeof purchaseOrderFormSchema>;
@@ -118,7 +119,7 @@ export default function NewPurchaseOrderPage() {
           const unitPrice = selectedPart?.cost || selectedPart?.price || prItem.estimatedPricePerUnit || 0;
           const totalPrice = prItem.quantity * unitPrice;
           return {
-            id: prItem.id,
+            id: prItem.id, // Use PR item ID as base or generate new for PO item
             partId: prItem.partId || undefined,
             partName: prItem.partName || selectedPart?.name || "New Item",
             description: prItem.description || selectedPart?.name || "New Item Description",
@@ -132,7 +133,7 @@ export default function NewPurchaseOrderPage() {
         replaceItems([]);
       }
     }
-  }, [availableParts, replaceItems]);
+  }, [availableParts, replaceItems]); // availableParts must be stable or memoized correctly
 
   useEffect(() => {
     setIsMounted(true);
@@ -144,10 +145,14 @@ export default function NewPurchaseOrderPage() {
       const requisitionId = searchParams.get("requisitionId");
       if (requisitionId) {
         form.setValue("purchaseRequisitionId", requisitionId);
+        // Ensure availableParts is loaded before calling loadPRItems if it depends on it
+        // This might require another useEffect that triggers loadPRItems when availableParts changes
+        // or ensuring stores are populated before this effect runs. For mock stores, it's tricky.
+        // For now, assuming availableParts is sufficiently populated at this point.
         loadPRItems(requisitionId);
       }
     }
-  }, [searchParams, loadPRItems, form]);
+  }, [searchParams, loadPRItems, form]); // loadPRItems might need to be stable if included
 
 
   useEffect(() => {
@@ -177,12 +182,12 @@ export default function NewPurchaseOrderPage() {
         ...data,
         items: data.items.map(item => ({
           ...item,
-          partId: item.partId || "", 
-          totalPrice: item.quantity * item.unitPrice,
+          partId: item.partId || "", // Ensure partId is always a string or handle it if it's truly optional elsewhere
+          totalPrice: item.quantity * item.unitPrice, // Recalculate for safety
         })),
         taxAmount: data.taxAmount === '' ? undefined : Number(data.taxAmount),
         shippingCost: data.shippingCost === '' ? undefined : Number(data.shippingCost),
-        createdByUserId: "currentUserPlaceholder",
+        createdByUserId: "currentUserPlaceholder", // Replace with actual user ID
       };
       newPurchaseOrder = (window as any).__purchaseOrderStore.addPurchaseOrder(poData);
     }
@@ -234,7 +239,7 @@ export default function NewPurchaseOrderPage() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Supplier</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value}>
+                      <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl><SelectTrigger><SelectValue placeholder="Select a Supplier" /></SelectTrigger></FormControl>
                         <SelectContent>
                           {availableSuppliers.length === 0 && <SelectItem value="loading" disabled>No active suppliers available.</SelectItem>}
@@ -275,7 +280,7 @@ export default function NewPurchaseOrderPage() {
                   render={({ field }) => (
                   <FormItem>
                       <FormLabel>Status</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value}>
+                      <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl><SelectTrigger><SelectValue placeholder="Select status" /></SelectTrigger></FormControl>
                       <SelectContent>
                           {Object.values(PURCHASE_ORDER_STATUSES).map(option => (
@@ -323,12 +328,16 @@ export default function NewPurchaseOrderPage() {
                                     field.onChange(selectedValue);
                                     if (selectedOption) {
                                       form.setValue(`items.${index}.partName`, selectedOption.name);
-                                      form.setValue(`items.${index}.description`, selectedOption.label);
+                                      form.setValue(`items.${index}.description`, selectedOption.label); // Using full label as description
                                       form.setValue(`items.${index}.unitPrice`, selectedOption.cost || selectedOption.price || 0);
                                       const qty = form.getValues(`items.${index}.quantity`) || 1;
                                       form.setValue(`items.${index}.totalPrice`, qty * (selectedOption.cost || selectedOption.price || 0));
                                     } else {
                                        form.setValue(`items.${index}.partName`, "");
+                                       // Optionally clear description and price if part is de-selected
+                                       // form.setValue(`items.${index}.description`, "");
+                                       // form.setValue(`items.${index}.unitPrice`, 0);
+                                       // form.setValue(`items.${index}.totalPrice`, 0);
                                     }
                                   }}
                                   placeholder="Search for a part..."
