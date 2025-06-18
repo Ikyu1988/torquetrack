@@ -81,9 +81,10 @@ const initialJobOrders: JobOrder[] = [
   },
 ];
 
-type AddJobOrderInput = Omit<JobOrder, 'id' | 'createdAt' | 'updatedAt' | 'createdByUserId' | 'grandTotal' | 'amountPaid' | 'paymentHistory'> & {
+type AddJobOrderInput = Omit<JobOrder, 'id' | 'createdAt' | 'updatedAt' | 'createdByUserId' | 'grandTotal' | 'amountPaid' | 'paymentHistory' | 'taxAmount'> & {
   initialPaymentMethod?: PaymentMethod;
   initialPaymentNotes?: string;
+  taxAmount?: number; // Keep this optional for direct sales if pre-calculated
 };
 
 
@@ -101,7 +102,9 @@ if (typeof window !== 'undefined') {
             taxRateValue = (window as any).__settingsStore.getSettings()?.defaultTaxRate || 0;
         }
         const subTotalBeforeTax = totalLabor + totalParts - discount;
-        const calculatedTaxAmount = jobOrderData.taxAmount === undefined ? (subTotalBeforeTax * (taxRateValue / 100)) : Number(jobOrderData.taxAmount);
+        // Always calculate tax unless it's explicitly provided (e.g. for direct sales where it might be calculated on client)
+        const calculatedTaxAmount = jobOrderData.taxAmount !== undefined ? Number(jobOrderData.taxAmount) : (subTotalBeforeTax * (taxRateValue / 100));
+
 
         const newJobOrder: JobOrder = {
           ...jobOrderData,
@@ -152,8 +155,9 @@ if (typeof window !== 'undefined') {
       updateJobOrder: (updatedJobOrder: JobOrder) => {
         const index = (window as any).__jobOrderStore.jobOrders.findIndex((jo: JobOrder) => jo.id === updatedJobOrder.id);
         if (index !== -1) {
-          const oldJobOrder = (window as any).__jobOrderStore.jobOrders[index];
-          
+          const oldJobOrder = { ...(window as any).__jobOrderStore.jobOrders[index] }; // Deep copy partsUsed for accurate stock reversal
+          oldJobOrder.partsUsed = oldJobOrder.partsUsed.map(p => ({...p}));
+
           const totalLabor = updatedJobOrder.servicesPerformed.reduce((sum, s) => sum + s.laborCost, 0);
           const totalParts = updatedJobOrder.partsUsed.reduce((sum, p) => sum + p.totalPrice, 0);
           const discount = Number(updatedJobOrder.discountAmount) || 0;
@@ -163,7 +167,7 @@ if (typeof window !== 'undefined') {
               taxRateValue = (window as any).__settingsStore.getSettings()?.defaultTaxRate || 0;
           }
           const subTotalBeforeTax = totalLabor + totalParts - discount;
-          const calculatedTaxAmount = updatedJobOrder.taxAmount === undefined ? (subTotalBeforeTax * (taxRateValue / 100)) : Number(updatedJobOrder.taxAmount);
+          const calculatedTaxAmount = subTotalBeforeTax * (taxRateValue / 100);
 
           (window as any).__jobOrderStore.jobOrders[index] = {
              ...updatedJobOrder,
@@ -173,6 +177,7 @@ if (typeof window !== 'undefined') {
             };
           
           if ((window as any).__inventoryStore) {
+            // Return old parts to stock
             oldJobOrder.partsUsed.forEach(oldItem => {
               const partIndex = (window as any).__inventoryStore.parts.findIndex((p: Part) => p.id === oldItem.partId);
               if (partIndex !== -1) {
@@ -180,6 +185,7 @@ if (typeof window !== 'undefined') {
               }
             });
 
+            // Deduct new parts from stock
             updatedJobOrder.partsUsed.forEach(newItem => {
                 const partIndex = (window as any).__inventoryStore.parts.findIndex((p: Part) => p.id === newItem.partId);
                 if(partIndex !== -1) {
@@ -198,6 +204,7 @@ if (typeof window !== 'undefined') {
          const jobOrderIndex = (window as any).__jobOrderStore.jobOrders.findIndex((jo: JobOrder) => jo.id === jobOrderId);
         if (jobOrderIndex !== -1) {
             const jobOrderToDelete = (window as any).__jobOrderStore.jobOrders[jobOrderIndex];
+            // Return parts to inventory
             if ((window as any).__inventoryStore && jobOrderToDelete.partsUsed) {
                 jobOrderToDelete.partsUsed.forEach(item => {
                     const partIndex = (window as any).__inventoryStore.parts.findIndex((p: Part) => p.id === item.partId);
@@ -206,7 +213,12 @@ if (typeof window !== 'undefined') {
                     }
                 });
             }
+            // Delete the job order
             (window as any).__jobOrderStore.jobOrders = (window as any).__jobOrderStore.jobOrders.filter((jo: JobOrder) => jo.id !== jobOrderId);
+            // Delete associated payments
+            if ((window as any).__paymentStore && jobOrderToDelete.paymentHistory) {
+                jobOrderToDelete.paymentHistory.forEach(p => (window as any).__paymentStore.deletePaymentById?.(p.id));
+            }
             return true;
         }
         return false;
@@ -217,7 +229,8 @@ if (typeof window !== 'undefined') {
             const payments = (window as any).__paymentStore.getPaymentsByJobOrderId(jobOrder.id);
             jobOrder.paymentHistory = payments;
             jobOrder.amountPaid = payments.reduce((sum: number, p: Payment) => sum + p.amount, 0);
-            if (jobOrder.amountPaid >= jobOrder.grandTotal) jobOrder.paymentStatus = PAYMENT_STATUSES.PAID;
+            if (jobOrder.amountPaid >= jobOrder.grandTotal && jobOrder.grandTotal > 0.001) jobOrder.paymentStatus = PAYMENT_STATUSES.PAID;
+            else if (jobOrder.grandTotal <= 0.001 && jobOrder.amountPaid <= 0.001) jobOrder.paymentStatus = PAYMENT_STATUSES.PAID; // Zero total orders are Paid
             else if (jobOrder.amountPaid > 0) jobOrder.paymentStatus = PAYMENT_STATUSES.PARTIAL;
             else jobOrder.paymentStatus = PAYMENT_STATUSES.UNPAID;
         }
@@ -231,13 +244,19 @@ if (typeof window !== 'undefined') {
             jobOrder.paymentHistory.push(payment);
             jobOrder.amountPaid += payment.amount;
           } else {
+            // This case might happen if a payment is added externally and then again through this function
+            // Recalculate amountPaid to be safe
             jobOrder.amountPaid = jobOrder.paymentHistory.reduce((sum: number, p: Payment) => sum + p.amount, 0);
           }
           
           const grandTotalNum = Number(jobOrder.grandTotal) || 0;
-          if (jobOrder.amountPaid >= grandTotalNum) {
+          // Check for floating point precision issues with a small epsilon
+          if (jobOrder.amountPaid >= grandTotalNum - 0.001 && grandTotalNum > 0.001) {
             jobOrder.paymentStatus = PAYMENT_STATUSES.PAID;
-          } else if (jobOrder.amountPaid > 0) {
+          } else if (grandTotalNum <= 0.001 && jobOrder.amountPaid <= 0.001) { // For zero or negative grand total, consider paid
+             jobOrder.paymentStatus = PAYMENT_STATUSES.PAID;
+          }
+           else if (jobOrder.amountPaid > 0) {
             jobOrder.paymentStatus = PAYMENT_STATUSES.PARTIAL;
           } else {
             jobOrder.paymentStatus = PAYMENT_STATUSES.UNPAID;
@@ -269,16 +288,11 @@ export default function JobOrdersPage() {
     if (typeof window !== 'undefined') {
       if ((window as any).__jobOrderStore) {
         const ordersFromStore = (window as any).__jobOrderStore.jobOrders.map((jo: JobOrder) => {
-            if ((window as any).__paymentStore) {
-                const payments = (window as any).__paymentStore.getPaymentsByJobOrderId(jo.id);
-                const amountPaid = payments.reduce((sum: number, p: Payment) => sum + p.amount, 0);
-                let paymentStatus = PAYMENT_STATUSES.UNPAID;
-                if (amountPaid >= jo.grandTotal) paymentStatus = PAYMENT_STATUSES.PAID;
-                else if (amountPaid > 0) paymentStatus = PAYMENT_STATUSES.PARTIAL;
-                return {...jo, paymentHistory: payments, amountPaid, paymentStatus};
+            if ((window as any).__paymentStore && (window as any).__jobOrderStore.getJobOrderById) { // ensure getJobOrderById is used
+                 return (window as any).__jobOrderStore.getJobOrderById(jo.id);
             }
             return jo;
-        });
+        }).filter(Boolean); // Filter out any undefined results if getJobOrderById returns undefined
         setJobOrders([...ordersFromStore]);
       }
       if ((window as any).__customerStore) { 
@@ -309,18 +323,12 @@ export default function JobOrdersPage() {
 
   const refreshJobOrders = () => {
     if (typeof window !== 'undefined' && (window as any).__jobOrderStore) {
-      const ordersFromStore = (window as any).__jobOrderStore.jobOrders.map((jo: JobOrder) => {
-            if ((window as any).__paymentStore) {
-                const payments = (window as any).__paymentStore.getPaymentsByJobOrderId(jo.id);
-                const amountPaid = payments.reduce((sum: number, p: Payment) => sum + p.amount, 0);
-                let paymentStatus = PAYMENT_STATUSES.UNPAID;
-                if (amountPaid >= jo.grandTotal && jo.grandTotal > 0) paymentStatus = PAYMENT_STATUSES.PAID;
-                else if (amountPaid > 0) paymentStatus = PAYMENT_STATUSES.PARTIAL;
-                else if (jo.grandTotal === 0 && amountPaid === 0) paymentStatus = PAYMENT_STATUSES.PAID; 
-                return {...jo, paymentHistory: payments, amountPaid, paymentStatus};
+       const ordersFromStore = (window as any).__jobOrderStore.jobOrders.map((jo: JobOrder) => {
+            if ((window as any).__paymentStore && (window as any).__jobOrderStore.getJobOrderById) { // ensure getJobOrderById is used
+                 return (window as any).__jobOrderStore.getJobOrderById(jo.id);
             }
             return jo;
-        });
+        }).filter(Boolean);
       setJobOrders([...ordersFromStore]);
     }
   };
@@ -330,7 +338,13 @@ export default function JobOrdersPage() {
     const interval = setInterval(() => {
       if (typeof window !== 'undefined' && (window as any).__jobOrderStore) {
         const storeJobOrdersRaw = (window as any).__jobOrderStore.jobOrders;
-        if (JSON.stringify(storeJobOrdersRaw.map((jo:JobOrder) => ({id: jo.id, updatedAt: jo.updatedAt, amountPaid: jo.amountPaid}))) !== JSON.stringify(jobOrders.map(jo => ({id: jo.id, updatedAt: jo.updatedAt, amountPaid: jo.amountPaid})))) {
+        const currentJOStates = jobOrders.map(jo => ({id: jo.id, updatedAt: jo.updatedAt, amountPaid: jo.amountPaid, paymentStatus: jo.paymentStatus}));
+        const storeJOStates = storeJobOrdersRaw.map((jo:JobOrder) => {
+            const fullJo = (window as any).__jobOrderStore.getJobOrderById(jo.id);
+            return {id: fullJo?.id, updatedAt: fullJo?.updatedAt, amountPaid: fullJo?.amountPaid, paymentStatus: fullJo?.paymentStatus};
+        }).filter(Boolean);
+
+        if (JSON.stringify(storeJOStates) !== JSON.stringify(currentJOStates)) {
           refreshJobOrders();
         }
       }
@@ -347,9 +361,6 @@ export default function JobOrdersPage() {
     if (jobOrderToDelete) {
       if (typeof window !== 'undefined' && (window as any).__jobOrderStore) {
         (window as any).__jobOrderStore.deleteJobOrder(jobOrderToDelete.id);
-        if ((window as any).__paymentStore && jobOrderToDelete.paymentHistory) {
-            jobOrderToDelete.paymentHistory.forEach(p => (window as any).__paymentStore.deletePaymentById?.(p.id));
-        }
         refreshJobOrders();
         toast({
           title: "Job Order Deleted",
@@ -466,3 +477,4 @@ export default function JobOrdersPage() {
     </div>
   );
 }
+

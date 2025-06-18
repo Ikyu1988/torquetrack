@@ -271,12 +271,17 @@ export default function InventoryPage() {
 
         headerMap.forEach(mapping => {
             const valueStr = values[mapping.index]?.trim();
-            if (valueStr === undefined || valueStr === "") {
-                if (!mapping.optional) {
+             if (valueStr === undefined || valueStr === "") {
+                if (!mapping.optional && (mapping.type === 'number' || mapping.type === 'integer' || mapping.type === 'boolean')) {
+                    // Required numeric/boolean fields cannot be empty, mark row as invalid
+                    if (mapping.targetKey === 'price' || mapping.targetKey === 'stockQuantity' || mapping.targetKey === 'isActive') {
+                        rowIsValid = false;
+                    }
                 }
-                partData[mapping.targetKey] = undefined;
+                partData[mapping.targetKey] = undefined; // Set as undefined for optional empty strings
                 return;
             }
+
 
             try {
                 switch (mapping.type) {
@@ -285,13 +290,19 @@ export default function InventoryPage() {
                         break;
                     case 'number':
                         const numVal = parseFloat(valueStr);
-                        if (isNaN(numVal)) throw new Error(`Invalid number for ${mapping.targetKey}`);
-                        (partData as any)[mapping.targetKey] = numVal;
+                        if (isNaN(numVal)) {
+                            if (!mapping.optional) rowIsValid = false; else partData[mapping.targetKey] = undefined;
+                        } else {
+                            (partData as any)[mapping.targetKey] = numVal;
+                        }
                         break;
                     case 'integer':
                         const intVal = parseInt(valueStr, 10);
-                        if (isNaN(intVal)) throw new Error(`Invalid integer for ${mapping.targetKey}`);
-                        (partData as any)[mapping.targetKey] = intVal;
+                         if (isNaN(intVal)) {
+                            if (!mapping.optional) rowIsValid = false; else partData[mapping.targetKey] = undefined;
+                        } else {
+                            (partData as any)[mapping.targetKey] = intVal;
+                        }
                         break;
                     case 'boolean':
                         const lowerVal = valueStr.toLowerCase();
@@ -300,7 +311,7 @@ export default function InventoryPage() {
                         } else if (lowerVal === 'false' || lowerVal === '0') {
                             partData[mapping.targetKey] = false;
                         } else {
-                             throw new Error(`Invalid boolean for ${mapping.targetKey}`);
+                             if (!mapping.optional) rowIsValid = false; else partData[mapping.targetKey] = undefined; // Or default to false/true
                         }
                         break;
                 }
@@ -310,7 +321,7 @@ export default function InventoryPage() {
         });
 
         if (partData.name === undefined || partData.price === undefined || partData.stockQuantity === undefined || partData.isActive === undefined) {
-            rowIsValid = false;
+            rowIsValid = false; 
         }
 
 
@@ -452,3 +463,4 @@ export default function InventoryPage() {
     </div>
   );
 }
+

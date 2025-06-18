@@ -28,14 +28,15 @@ const motorcycleFormSchema = z.object({
   customerId: z.string().min(1, { message: "Customer is required." }),
   make: z.string().min(1, { message: "Make is required." }).max(50),
   model: z.string().min(1, { message: "Model is required." }).max(50),
-  year: z.coerce.number().optional().refine(val => val === undefined || (val >= 1900 && val <= new Date().getFullYear() + 1), {
-    message: `Year must be between 1900 and ${new Date().getFullYear() + 1}.`,
-  }),
-  color: z.string().max(30).optional(),
+  year: z.preprocess(
+    (val) => (val === "" || val === undefined || val === null) ? undefined : parseInt(String(val), 10),
+    z.number().int().min(1900, { message: "Year must be 1900 or later."}).max(new Date().getFullYear() + 1, { message: `Year cannot be in the future beyond ${new Date().getFullYear() + 1}.` }).optional()
+  ),
+  color: z.string().max(30).optional().or(z.literal('')),
   plateNumber: z.string().min(1, { message: "Plate number is required." }).max(20),
-  vin: z.string().max(50).optional(),
+  vin: z.string().max(50).optional().or(z.literal('')),
   odometer: z.coerce.number().min(0, { message: "Odometer reading must be positive." }),
-  notes: z.string().max(500).optional(),
+  notes: z.string().max(500).optional().or(z.literal('')),
 });
 
 type MotorcycleFormValues = z.infer<typeof motorcycleFormSchema>;
@@ -86,7 +87,7 @@ export default function EditMotorcyclePage() {
           customerId: motorcycleData.customerId,
           make: motorcycleData.make,
           model: motorcycleData.model,
-          year: motorcycleData.year,
+          year: motorcycleData.year ?? undefined,
           color: motorcycleData.color || "",
           plateNumber: motorcycleData.plateNumber,
           vin: motorcycleData.vin || "",
@@ -113,7 +114,7 @@ export default function EditMotorcyclePage() {
         const updatedMotorcycleData: Motorcycle = {
           ...existingMotorcycle,
           ...data,
-          year: data.year || undefined, // Ensure year is number or undefined
+          year: data.year === undefined || isNaN(Number(data.year)) ? undefined : Number(data.year),
           updatedAt: new Date(),
         };
         success = (window as any).__motorcycleStore.updateMotorcycle(updatedMotorcycleData);
@@ -227,7 +228,7 @@ export default function EditMotorcyclePage() {
                     <FormItem>
                       <FormLabel>Year (Optional)</FormLabel>
                       <FormControl>
-                        <Input type="number" placeholder="e.g., 2022" {...field} onChange={e => field.onChange(parseInt(e.target.value,10) || undefined)} />
+                        <Input type="number" placeholder="e.g., 2022" {...field} onChange={e => field.onChange(e.target.value === '' ? undefined : parseInt(e.target.value,10))} value={field.value ?? ''} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -324,3 +325,4 @@ export default function EditMotorcyclePage() {
     </div>
   );
 }
+

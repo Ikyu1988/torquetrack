@@ -44,9 +44,11 @@ const directSaleFormSchema = z.object({
 
 type DirectSaleFormValues = z.infer<typeof directSaleFormSchema>;
 
-type AddJobOrderInput = Omit<JobOrder, 'id' | 'createdAt' | 'updatedAt' | 'createdByUserId' | 'grandTotal' | 'amountPaid' | 'paymentHistory'> & {
+// Adjusted type for adding a job order, taxAmount is now handled by the store logic mostly
+type AddJobOrderInput = Omit<JobOrder, 'id' | 'createdAt' | 'updatedAt' | 'createdByUserId' | 'grandTotal' | 'amountPaid' | 'paymentHistory' | 'taxAmount'> & {
   initialPaymentMethod?: PaymentMethod;
   initialPaymentNotes?: string;
+  taxAmount?: number; // Make explicit that taxAmount can be passed, or will be calculated
 };
 
 
@@ -83,7 +85,8 @@ export default function DirectSalesPage() {
     return partsUsedWatch.reduce((sum, item) => sum + (Number(item.totalPrice) || 0), 0);
   }, [partsUsedWatch]);
 
-  const taxAmount = useMemo(() => {
+  // Tax calculation for display purposes in the form
+  const calculatedTaxAmountForDisplay = useMemo(() => {
     if (!shopSettings || shopSettings.defaultTaxRate === undefined || shopSettings.defaultTaxRate <= 0) return 0;
     const currentSubTotalNet = subTotalParts - (Number(discountAmountWatch) || 0);
     return currentSubTotalNet * (shopSettings.defaultTaxRate / 100);
@@ -91,8 +94,8 @@ export default function DirectSalesPage() {
 
   const grandTotal = useMemo(() => {
     const currentSubTotalNet = subTotalParts - (Number(discountAmountWatch) || 0);
-    return currentSubTotalNet + taxAmount;
-  }, [subTotalParts, discountAmountWatch, taxAmount]);
+    return currentSubTotalNet + calculatedTaxAmountForDisplay;
+  }, [subTotalParts, discountAmountWatch, calculatedTaxAmountForDisplay]);
 
   useEffect(() => {
     setIsMounted(true);
@@ -106,6 +109,7 @@ export default function DirectSalesPage() {
   function onSubmit(data: DirectSaleFormValues) {
     let newSaleOrder: JobOrder | null = null;
     if (typeof window !== 'undefined' && (window as any).__jobOrderStore) {
+        // Tax will be calculated by the __jobOrderStore.addJobOrder function
         const saleOrderData: AddJobOrderInput = {
             customerId: data.customerId || undefined,
             motorcycleId: undefined, 
@@ -114,8 +118,8 @@ export default function DirectSalesPage() {
             partsUsed: data.partsUsed.map(p => ({...p})), 
             diagnostics: "Direct Parts Sale",
             discountAmount: data.discountAmount === '' ? undefined : Number(data.discountAmount),
-            taxAmount: taxAmount, 
-            paymentStatus: PAYMENT_STATUSES.PAID,
+            // taxAmount will be calculated by addJobOrder store function
+            paymentStatus: PAYMENT_STATUSES.PAID, // Direct sales are typically paid immediately
             initialPaymentMethod: data.paymentMethod, 
             initialPaymentNotes: data.paymentNotes || `Payment for direct sale`, 
         };
@@ -317,7 +321,7 @@ export default function DirectSalesPage() {
                          {shopSettings?.defaultTaxRate !== undefined && shopSettings.defaultTaxRate > 0 && (
                             <div className="flex justify-between items-center">
                                 <span className="text-sm font-medium">Tax ({shopSettings.defaultTaxRate}%):</span>
-                                <span className="text-sm font-semibold">{currency}{taxAmount.toFixed(2)}</span>
+                                <span className="text-sm font-semibold">{currency}{calculatedTaxAmountForDisplay.toFixed(2)}</span>
                             </div>
                         )}
                         <Separator className="my-2"/>
@@ -385,3 +389,4 @@ export default function DirectSalesPage() {
     </div>
   );
 }
+

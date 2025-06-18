@@ -36,15 +36,13 @@ const serviceFormSchema = z.object({
   commissionValue: z.coerce.number().min(0).optional().or(z.literal('')),
   isActive: z.boolean(),
 }).refine(data => {
-  if (data.commissionType && (data.commissionValue === undefined || data.commissionValue === '')) {
-    return false;
-  }
-  if (!data.commissionType && (data.commissionValue !== undefined && data.commissionValue !== '')) {
-    return false;
-  }
+  const typeIsSet = !!data.commissionType;
+  const valueIsSet = data.commissionValue !== undefined && data.commissionValue !== '' && !isNaN(Number(data.commissionValue));
+  if (typeIsSet && !valueIsSet) return false; // Type set, value not set (or not a number) -> invalid
+  if (!typeIsSet && valueIsSet) return false; // Type not set, value set -> invalid
   return true;
 }, {
-  message: "Commission value is required if commission type is selected, and vice-versa.",
+  message: "If Commission Type is selected, Commission Value (numeric) must be provided. If no Type, Value must be empty.",
   path: ["commissionValue"], 
 });
 
@@ -86,7 +84,7 @@ export default function NewServicePage() {
     const serviceData: Omit<Service, 'id' | 'createdAt' | 'updatedAt'> = {
       ...data,
       estimatedHours: data.estimatedHours === '' ? undefined : Number(data.estimatedHours),
-      commissionValue: data.commissionValue === '' ? undefined : Number(data.commissionValue),
+      commissionValue: (data.commissionValue === '' || data.commissionValue === undefined || isNaN(Number(data.commissionValue))) ? undefined : Number(data.commissionValue),
     };
     
     if (!data.commissionType) {
@@ -221,7 +219,15 @@ export default function NewServicePage() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Commission Type (Optional)</FormLabel>
-                      <Select onValueChange={(value) => field.onChange(value === "none" ? undefined : value)} value={field.value || "none"}>
+                      <Select 
+                        onValueChange={(value) => {
+                            field.onChange(value === "none" ? undefined : value);
+                            if (value === "none") {
+                                form.setValue("commissionValue", undefined); // Clear value if type is None
+                            }
+                        }} 
+                        value={field.value || "none"}
+                      >
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="Select commission type" />
@@ -252,7 +258,9 @@ export default function NewServicePage() {
                             type="number" 
                             placeholder={commissionType === COMMISSION_TYPES.PERCENTAGE ? "e.g., 10" : "e.g., 250.00"}
                             {...field} 
-                            onChange={e => field.onChange(e.target.value === '' ? '' : parseFloat(e.target.value) || 0)} />
+                            onChange={e => field.onChange(e.target.value === '' ? '' : parseFloat(e.target.value))} 
+                            value={field.value === undefined ? '' : field.value}
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -300,3 +308,4 @@ export default function NewServicePage() {
     </div>
   );
 }
+

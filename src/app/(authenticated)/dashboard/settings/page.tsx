@@ -28,7 +28,6 @@ import { Switch } from "@/components/ui/switch";
 const moduleSettingsSchema = z.object({
   reportsEnabled: z.boolean().default(true),
   directSalesEnabled: z.boolean().default(true),
-  // Add other module toggles here with default values
 }).default({ reportsEnabled: true, directSalesEnabled: true });
 
 
@@ -40,8 +39,14 @@ const settingsFormSchema = z.object({
   shopLogoUrl: z.string().url("Invalid URL format for logo.").max(255).optional().or(z.literal('')),
   
   currencySymbol: z.string().min(1, "Currency symbol is required.").max(5),
-  defaultTaxRate: z.coerce.number().min(0, "Tax rate must be non-negative.").max(100, "Tax rate cannot exceed 100%.").optional().or(z.literal('')),
-  defaultLaborRate: z.coerce.number().min(0, "Labor rate must be non-negative.").optional().or(z.literal('')),
+  defaultTaxRate: z.preprocess(
+    (val) => (val === "" || val === undefined || val === null || isNaN(Number(val))) ? undefined : parseFloat(String(val)),
+    z.number().min(0, "Tax rate must be non-negative.").max(100, "Tax rate cannot exceed 100%.").optional()
+  ),
+  defaultLaborRate: z.preprocess(
+    (val) => (val === "" || val === undefined || val === null || isNaN(Number(val))) ? undefined : parseFloat(String(val)),
+    z.number().min(0, "Labor rate must be non-negative.").optional()
+  ),
 
   theme: z.enum(['light', 'dark']),
   moduleSettings: moduleSettingsSchema,
@@ -55,9 +60,9 @@ const initialSettings: ShopSettings = {
   shopPhone: "0917-123-4567",
   shopEmail: "contact@torquetrack.ph",
   shopLogoUrl: "",
-  currencySymbol: "₱", // Changed to Peso
-  defaultTaxRate: 12, // Example VAT
-  defaultLaborRate: 500, // Example labor rate in Peso
+  currencySymbol: "₱", 
+  defaultTaxRate: 12, 
+  defaultLaborRate: 500, 
   theme: 'dark', 
   moduleSettings: {
     reportsEnabled: true,
@@ -100,7 +105,7 @@ export default function SettingsPage() {
       shopPhone: "",
       shopEmail: "",
       shopLogoUrl: "",
-      currencySymbol: "₱", // Default to Peso in form
+      currencySymbol: "₱", 
       defaultTaxRate: undefined,
       defaultLaborRate: undefined,
       theme: 'dark',
@@ -149,8 +154,8 @@ export default function SettingsPage() {
           shopEmail: currentSettings.shopEmail || "",
           shopLogoUrl: currentSettings.shopLogoUrl || "",
           currencySymbol: currentSettings.currencySymbol,
-          defaultTaxRate: currentSettings.defaultTaxRate === undefined ? '' : currentSettings.defaultTaxRate,
-          defaultLaborRate: currentSettings.defaultLaborRate === undefined ? '' : currentSettings.defaultLaborRate,
+          defaultTaxRate: currentSettings.defaultTaxRate === undefined ? undefined : currentSettings.defaultTaxRate,
+          defaultLaborRate: currentSettings.defaultLaborRate === undefined ? undefined : currentSettings.defaultLaborRate,
           theme: themeToUse,
           moduleSettings: {
             reportsEnabled: currentSettings.moduleSettings?.reportsEnabled ?? true,
@@ -160,8 +165,8 @@ export default function SettingsPage() {
       } else { 
          form.reset({
           ...initialSettings,
-          defaultTaxRate: initialSettings.defaultTaxRate === undefined ? '' : initialSettings.defaultTaxRate,
-          defaultLaborRate: initialSettings.defaultLaborRate === undefined ? '' : initialSettings.defaultLaborRate,
+          defaultTaxRate: initialSettings.defaultTaxRate === undefined ? undefined : initialSettings.defaultTaxRate,
+          defaultLaborRate: initialSettings.defaultLaborRate === undefined ? undefined : initialSettings.defaultLaborRate,
           theme: themeToUse,
          });
       }
@@ -182,8 +187,8 @@ export default function SettingsPage() {
     if (typeof window !== 'undefined' && (window as any).__settingsStore) {
       updatedSettings = (window as any).__settingsStore.updateSettings({
         ...data,
-        defaultTaxRate: data.defaultTaxRate === '' ? undefined : Number(data.defaultTaxRate),
-        defaultLaborRate: data.defaultLaborRate === '' ? undefined : Number(data.defaultLaborRate),
+        defaultTaxRate: data.defaultTaxRate === undefined || isNaN(Number(data.defaultTaxRate)) ? undefined : Number(data.defaultTaxRate),
+        defaultLaborRate: data.defaultLaborRate === undefined || isNaN(Number(data.defaultLaborRate)) ? undefined : Number(data.defaultLaborRate),
         moduleSettings: data.moduleSettings,
       });
     }
@@ -337,7 +342,14 @@ export default function SettingsPage() {
                         <FormItem>
                           <FormLabel>Default Tax Rate (%) (Optional)</FormLabel>
                           <FormControl>
-                            <Input type="number" step="0.01" placeholder="e.g., 12" {...field} onChange={e => field.onChange(e.target.value === '' ? '' : parseFloat(e.target.value) || 0)} />
+                            <Input 
+                              type="number" 
+                              step="0.01" 
+                              placeholder="e.g., 12" 
+                              {...field} 
+                              onChange={e => field.onChange(e.target.value === '' ? undefined : parseFloat(e.target.value))}
+                              value={field.value ?? ''} 
+                            />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -348,9 +360,16 @@ export default function SettingsPage() {
                       name="defaultLaborRate"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Default Labor Rate (₱/hr) (Optional)</FormLabel>
+                          <FormLabel>Default Labor Rate ({form.getValues("currencySymbol") || '₱'}/hr) (Optional)</FormLabel>
                           <FormControl>
-                            <Input type="number" step="0.01" placeholder="e.g., 500" {...field} onChange={e => field.onChange(e.target.value === '' ? '' : parseFloat(e.target.value) || 0)} />
+                            <Input 
+                              type="number" 
+                              step="0.01" 
+                              placeholder="e.g., 500" 
+                              {...field} 
+                              onChange={e => field.onChange(e.target.value === '' ? undefined : parseFloat(e.target.value))} 
+                              value={field.value ?? ''}
+                            />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -466,3 +485,4 @@ export default function SettingsPage() {
     </div>
   );
 }
+
