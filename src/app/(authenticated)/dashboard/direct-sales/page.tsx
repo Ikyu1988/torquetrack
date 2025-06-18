@@ -16,7 +16,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ShoppingCart, PlusCircle, Trash2, Printer } from "lucide-react"; // Added Printer
+import { ShoppingCart, PlusCircle, Trash2, Printer, Eye, ClipboardList } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
 import type { JobOrder, Customer, Part, PaymentMethod, ShopSettings } from "@/types";
@@ -24,6 +24,17 @@ import { useEffect, useState, useMemo } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { JOB_ORDER_STATUSES, PAYMENT_STATUSES, PAYMENT_METHOD_OPTIONS } from "@/lib/constants";
 import { Separator } from "@/components/ui/separator";
+import Link from "next/link";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { format } from "date-fns";
 
 const directSalePartItemSchema = z.object({
   id: z.string(), 
@@ -46,11 +57,10 @@ type DirectSaleFormValues = z.infer<typeof directSaleFormSchema>;
 
 const WALK_IN_CUSTOMER_IDENTIFIER = "__walk_in_special_value__";
 
-// Adjusted type for adding a job order, taxAmount is now handled by the store logic mostly
 type AddJobOrderInput = Omit<JobOrder, 'id' | 'createdAt' | 'updatedAt' | 'createdByUserId' | 'grandTotal' | 'amountPaid' | 'paymentHistory' | 'taxAmount'> & {
   initialPaymentMethod?: PaymentMethod;
   initialPaymentNotes?: string;
-  taxAmount?: number; // Make explicit that taxAmount can be passed, or will be calculated
+  taxAmount?: number;
 };
 
 
@@ -61,13 +71,20 @@ export default function DirectSalesPage() {
   const [availableParts, setAvailableParts] = useState<Part[]>([]);
   const [shopSettings, setShopSettings] = useState<ShopSettings | null>(null);
   const [isMounted, setIsMounted] = useState(false);
+  const [completedSales, setCompletedSales] = useState<JobOrder[]>([]);
 
   const currency = useMemo(() => shopSettings?.currencySymbol || '₱', [shopSettings]);
+
+  const customerMap = useMemo(() => {
+    const map = new Map<string, string>();
+    customers.forEach(c => map.set(c.id, `${c.firstName} ${c.lastName}`));
+    return map;
+  }, [customers]);
 
   const form = useForm<DirectSaleFormValues>({
     resolver: zodResolver(directSaleFormSchema),
     defaultValues: {
-      customerId: undefined, // Default to undefined to show placeholder
+      customerId: undefined,
       partsUsed: [],
       discountAmount: undefined,
       paymentMethod: "Cash",
@@ -87,7 +104,6 @@ export default function DirectSalesPage() {
     return partsUsedWatch.reduce((sum, item) => sum + (Number(item.totalPrice) || 0), 0);
   }, [partsUsedWatch]);
 
-  // Tax calculation for display purposes in the form
   const calculatedTaxAmountForDisplay = useMemo(() => {
     if (!shopSettings || shopSettings.defaultTaxRate === undefined || shopSettings.defaultTaxRate <= 0) return 0;
     const currentSubTotalNet = subTotalParts - (Number(discountAmountWatch) || 0);
@@ -99,19 +115,34 @@ export default function DirectSalesPage() {
     return currentSubTotalNet + calculatedTaxAmountForDisplay;
   }, [subTotalParts, discountAmountWatch, calculatedTaxAmountForDisplay]);
 
-  useEffect(() => {
-    setIsMounted(true);
+  const fetchAndSetData = () => {
     if (typeof window !== 'undefined') {
       if ((window as any).__customerStore) setCustomers((window as any).__customerStore.customers);
       if ((window as any).__inventoryStore) setAvailableParts((window as any).__inventoryStore.parts.filter((p: Part) => p.isActive && p.stockQuantity > 0));
       if ((window as any).__settingsStore) setShopSettings((window as any).__settingsStore.getSettings());
+      if ((window as any).__jobOrderStore) {
+        const allJobOrders: JobOrder[] = (window as any).__jobOrderStore.jobOrders || [];
+        const sales = allJobOrders.filter(jo => jo.status === JOB_ORDER_STATUSES.SALE_COMPLETED);
+        setCompletedSales(sales);
+      }
     }
+  };
+
+  useEffect(() => {
+    setIsMounted(true);
+    fetchAndSetData();
   }, []);
+
+  useEffect(() => {
+    if (!isMounted) return;
+    const interval = setInterval(fetchAndSetData, 2000); // Refresh data periodically
+    return () => clearInterval(interval);
+  }, [isMounted]);
+
 
   function onSubmit(data: DirectSaleFormValues) {
     let newSaleOrder: JobOrder | null = null;
     if (typeof window !== 'undefined' && (window as any).__jobOrderStore) {
-        // Tax will be calculated by the __jobOrderStore.addJobOrder function
         const saleOrderData: AddJobOrderInput = {
             customerId: data.customerId === WALK_IN_CUSTOMER_IDENTIFIER ? undefined : data.customerId,
             motorcycleId: undefined, 
@@ -120,8 +151,7 @@ export default function DirectSalesPage() {
             partsUsed: data.partsUsed.map(p => ({...p})), 
             diagnostics: "Direct Parts Sale",
             discountAmount: data.discountAmount === '' ? undefined : Number(data.discountAmount),
-            // taxAmount will be calculated by addJobOrder store function
-            paymentStatus: PAYMENT_STATUSES.PAID, // Direct sales are typically paid immediately
+            paymentStatus: PAYMENT_STATUSES.PAID, 
             initialPaymentMethod: data.paymentMethod, 
             initialPaymentNotes: data.paymentNotes || `Payment for direct sale`, 
         };
@@ -134,9 +164,7 @@ export default function DirectSalesPage() {
           description: `Direct sale #${newSaleOrder.id.substring(0,6)} processed successfully. Grand Total: ${currency}${newSaleOrder.grandTotal.toFixed(2)}`,
         });
         form.reset({ customerId: undefined, partsUsed: [], discountAmount: undefined, paymentMethod: "Cash", paymentNotes: "" });
-        if ((window as any).__inventoryStore) {
-             setAvailableParts((window as any).__inventoryStore.parts.filter((p: Part) => p.isActive && p.stockQuantity > 0));
-        }
+        fetchAndSetData(); // Refresh lists after sale
       } else {
          toast({
           title: "Error",
@@ -172,7 +200,7 @@ export default function DirectSalesPage() {
                     <FormLabel>Customer (Optional)</FormLabel>
                     <Select 
                       onValueChange={field.onChange} 
-                      value={field.value} // field.value can be undefined
+                      value={field.value}
                     >
                       <FormControl>
                         <SelectTrigger>
@@ -394,6 +422,58 @@ export default function DirectSalesPage() {
           </Form>
         </CardContent>
       </Card>
+
+      <Separator className="my-8"/>
+
+      <Card className="shadow-lg">
+        <CardHeader>
+            <div className="flex items-center gap-3">
+                <ClipboardList className="h-6 w-6 text-primary" />
+                <CardTitle className="font-headline text-2xl">Completed Direct Sales</CardTitle>
+            </div>
+            <CardDescription>A list of your recent direct part sales.</CardDescription>
+        </CardHeader>
+        <CardContent>
+            {completedSales.length > 0 ? (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Sale ID</TableHead>
+                  <TableHead>Customer</TableHead>
+                  <TableHead>Date</TableHead>
+                  <TableHead className="text-right">Total Amount</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {completedSales.map((sale) => (
+                  <TableRow key={sale.id}>
+                    <TableCell className="font-medium">{`#${sale.id.substring(0,6)}`}</TableCell>
+                    <TableCell>{sale.customerId ? customerMap.get(sale.customerId) || "N/A" : "Walk-in Customer"}</TableCell>
+                    <TableCell>{format(new Date(sale.createdAt), "MMM dd, yyyy")}</TableCell>
+                    <TableCell className="text-right">{currency}{(sale.grandTotal || 0).toFixed(2)}</TableCell>
+                    <TableCell className="text-right">
+                      <Button variant="ghost" size="icon" asChild className="hover:text-primary">
+                        <Link href={`/dashboard/job-orders/${sale.id}`}>
+                          <Eye className="h-4 w-4" />
+                          <span className="sr-only">View Sale Details</span>
+                        </Link>
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          ) : (
+            <div className="flex flex-col items-center justify-center gap-4 py-10 text-muted-foreground">
+                <ShoppingCart className="h-16 w-16" />
+                <p className="text-lg">No completed direct sales found yet.</p>
+                <p>Create a new sale using the form above.</p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
     </div>
   );
 }
