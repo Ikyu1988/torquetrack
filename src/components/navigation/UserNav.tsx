@@ -51,7 +51,7 @@ export function UserNav() {
       <DropdownMenuContent className="w-56" align="end" forceMount>
         <DropdownMenuLabel className="font-normal">
           <div className="flex flex-col space-y-1">
-            <p className="text-sm font-medium leading-none">{userDisplayName}</p>
+            <p className="text-sm font-medium leading-none">{userDisplayName} <span className="text-xs text-muted-foreground">(Admin)</span></p>
             <p className="text-xs leading-none text-muted-foreground">
               {userEmail}
             </p>
