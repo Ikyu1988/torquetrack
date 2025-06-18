@@ -150,6 +150,7 @@ export default function InventoryPage() {
   const [isMounted, setIsMounted] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [shopSettings, setShopSettings] = useState<ShopSettings | null>(null);
+  const shopSettingsRef = useRef<ShopSettings | null>(null); // For interval comparison
 
   const currency = useMemo(() => shopSettings?.currencySymbol || '₱', [shopSettings]);
 
@@ -160,7 +161,9 @@ export default function InventoryPage() {
         setParts([...(window as any).__inventoryStore.parts]);
       }
       if ((window as any).__settingsStore) {
-        setShopSettings((window as any).__settingsStore.getSettings());
+        const currentSettings = (window as any).__settingsStore.getSettings();
+        setShopSettings(currentSettings);
+        shopSettingsRef.current = currentSettings; // Initialize ref
       }
     }
   }, []);
@@ -175,15 +178,26 @@ export default function InventoryPage() {
     if (!isMounted) return;
 
     const interval = setInterval(() => {
-      if (typeof window !== 'undefined' && (window as any).__inventoryStore) {
-        const storeParts = (window as any).__inventoryStore.parts;
-        if (JSON.stringify(storeParts) !== JSON.stringify(parts)) {
-          refreshParts();
+      if (typeof window !== 'undefined') {
+        // Refresh parts data
+        if((window as any).__inventoryStore) {
+            const storeParts = (window as any).__inventoryStore.parts;
+            if (JSON.stringify(storeParts) !== JSON.stringify(parts)) {
+            refreshParts();
+            }
+        }
+        // Refresh shop settings
+        if ((window as any).__settingsStore) {
+            const newSettings = (window as any).__settingsStore.getSettings();
+            if (JSON.stringify(newSettings) !== JSON.stringify(shopSettingsRef.current)) {
+                setShopSettings(newSettings);
+                shopSettingsRef.current = newSettings;
+            }
         }
       }
-    }, 1000);
+    }, 1000); // Check every second
     return () => clearInterval(interval);
-  }, [parts, isMounted]);
+  }, [parts, isMounted]); // Only re-subscribe interval if isMounted changes (or parts for its specific logic)
 
   const handleDeletePart = (part: Part) => {
     setPartToDelete(part);
