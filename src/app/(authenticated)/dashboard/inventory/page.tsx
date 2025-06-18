@@ -4,7 +4,7 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { PlusCircle, Package, Pencil, Trash2, Download, Upload, AlertTriangle } from "lucide-react";
+import { PlusCircle, Package, Pencil, Trash2, Download, Upload, AlertTriangle, Edit } from "lucide-react";
 import Link from "next/link";
 import {
   Table,
@@ -86,7 +86,7 @@ const initialParts: Part[] = [
     price: 18.00,
     cost: 9.00,
     supplier: "BikeParts Direct",
-    stockQuantity: 3, // Low stock example
+    stockQuantity: 3, 
     minStockAlert: 5,
     isActive: true,
     createdAt: new Date(),
@@ -101,7 +101,7 @@ const initialParts: Part[] = [
     price: 22.00,
     cost: 11.00,
     supplier: "MotoSupplies Inc.",
-    stockQuantity: 0, // Out of stock example
+    stockQuantity: 0, 
     minStockAlert: 3,
     isActive: true,
     createdAt: new Date(),
@@ -392,6 +392,11 @@ export default function InventoryPage() {
             <CardDescription>Manage parts, stock levels, and suppliers.</CardDescription>
           </div>
           <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
+            <Button asChild variant="outline" className="w-full sm:w-auto">
+                <Link href="/dashboard/inventory/adjust-stock">
+                    <Edit className="mr-2 h-4 w-4" /> Adjust Stock
+                </Link>
+            </Button>
             <Button onClick={() => fileInputRef.current?.click()} variant="outline" className="w-full sm:w-auto">
               <Upload className="mr-2 h-4 w-4" /> Import CSV
             </Button>
@@ -501,3 +506,4 @@ export default function InventoryPage() {
     </div>
   );
 }
+

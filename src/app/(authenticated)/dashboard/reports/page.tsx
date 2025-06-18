@@ -4,7 +4,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { FileText, BarChart2, DollarSign, Download, Filter, Search } from "lucide-react"; // Removed unused icons
+import { FileText, BarChart2, DollarSign, Download, Filter, Search, PackageWarning } from "lucide-react";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
@@ -17,7 +17,7 @@ import { format } from "date-fns";
 const convertToCSV = (data: any[], headers?: string[]): string => {
   if (data.length === 0) return "";
   const array = [Object.keys(data[0]), ...data.map(item => Object.values(item))];
-  if (headers && headers.length === array[0].length) { // Ensure headers match data structure
+  if (headers && headers.length === array[0].length) { 
     array[0] = headers;
   } else if (headers) {
     console.warn("CSV export header length mismatch. Using default keys.");
@@ -73,6 +73,8 @@ export default function ReportsPage() {
   const [incomeSummary, setIncomeSummary] = useState<{ totalIncome: number }>({ totalIncome: 0 });
   const [customerServiceHistory, setCustomerServiceHistory] = useState<any[]>([]);
   const [selectedCustomerIdForHistory, setSelectedCustomerIdForHistory] = useState<string | "ALL">("ALL");
+  const [lowStockItemsReport, setLowStockItemsReport] = useState<any[]>([]);
+
 
   const [loading, setLoading] = useState<Record<string, boolean>>({});
 
@@ -104,20 +106,21 @@ export default function ReportsPage() {
   }, [allMechanics]);
 
   const handleGenerateReport = (reportType: string) => {
-    if (!startDate || !endDate) {
-      toast({ title: "Select Dates", description: "Please select both start and end dates.", variant: "destructive" });
+    if ((reportType !== "inventoryValuation" && reportType !== "lowStockItems") && (!startDate || !endDate)) {
+      toast({ title: "Select Dates", description: "Please select both start and end dates for this report.", variant: "destructive" });
       return;
     }
-    if (endDate < startDate) {
+    if (startDate && endDate && endDate < startDate) {
       toast({ title: "Invalid Date Range", description: "End date cannot be earlier than start date.", variant: "destructive" });
       return;
     }
 
     setLoading(prev => ({ ...prev, [reportType]: true }));
 
-    setTimeout(() => { // Simulate API call
+    setTimeout(() => { 
       try {
         const filteredJobOrders = allJobOrders.filter(jo => {
+          if (!startDate || !endDate) return true; // For reports not using date filter yet
           const joDate = new Date(jo.createdAt);
           const inDateRange = joDate >= startDate && joDate <= endDate;
           const statusMatch = selectedStatus === "ALL" || jo.status === selectedStatus;
@@ -146,7 +149,8 @@ export default function ReportsPage() {
           
           case "commissionReport":
             let commissions: any[] = [];
-            allJobOrders.filter(jo => { // Use allJobOrders for commission, then filter by date within
+            allJobOrders.filter(jo => { 
+                if (!startDate || !endDate) return false;
                 const joDate = new Date(jo.createdAt);
                 const mechanicFilterMatch = selectedMechanicId === "ALL" || jo.servicesPerformed?.some(s => s.assignedMechanicId === selectedMechanicId);
                 return joDate >= startDate && joDate <= endDate && mechanicFilterMatch;
@@ -180,7 +184,8 @@ export default function ReportsPage() {
 
           case "partsUsage":
             const partsUsage: Record<string, { name: string, sku?: string, quantity: number, totalValue: number }> = {};
-             allJobOrders.filter(jo => { // Filter by date range for parts usage
+             allJobOrders.filter(jo => { 
+                if (!startDate || !endDate) return false;
                 const joDate = new Date(jo.createdAt);
                 return joDate >= startDate && joDate <= endDate;
             }).forEach(jo => {
@@ -198,7 +203,8 @@ export default function ReportsPage() {
 
           case "serviceSales":
             const serviceSales: Record<string, { name: string, count: number, totalRevenue: number }> = {};
-             allJobOrders.filter(jo => { // Filter by date range for service sales
+             allJobOrders.filter(jo => { 
+                if (!startDate || !endDate) return false;
                 const joDate = new Date(jo.createdAt);
                 return joDate >= startDate && joDate <= endDate;
             }).forEach(jo => {
@@ -213,7 +219,7 @@ export default function ReportsPage() {
             setServiceSalesReport(Object.values(serviceSales).map(s => ({ ServiceName: s.name, TimesPerformed: s.count, TotalRevenue: `${currencySymbol}${s.totalRevenue.toFixed(2)}` })));
             break;
           
-          case "inventoryValuation": // Not date dependent
+          case "inventoryValuation": 
             let totalVal = 0;
             const valuationDetails = allParts.map(part => {
                 const value = part.stockQuantity * (part.cost ?? part.price); 
@@ -230,6 +236,7 @@ export default function ReportsPage() {
             break;
 
           case "incomeSummary":
+            if (!startDate || !endDate) return;
             const currentIncome = allPayments
               .filter(p => {
                 const paymentDate = new Date(p.paymentDate);
@@ -246,7 +253,7 @@ export default function ReportsPage() {
                  break;
             }
             const history = allJobOrders
-                .filter(jo => jo.customerId === selectedCustomerIdForHistory) // Not date filtered here, shows all history for customer
+                .filter(jo => jo.customerId === selectedCustomerIdForHistory) 
                 .map(jo => ({
                     JobOrderID: jo.id.substring(0,6),
                     Date: format(new Date(jo.createdAt), "yyyy-MM-dd"),
@@ -255,6 +262,19 @@ export default function ReportsPage() {
                     Total: `${currencySymbol}${jo.grandTotal.toFixed(2)}`,
                 }));
             setCustomerServiceHistory(history);
+            break;
+
+          case "lowStockItems":
+            const lowItems = allParts
+                .filter(part => part.isActive && part.minStockAlert !== undefined && part.stockQuantity <= part.minStockAlert)
+                .map(part => ({
+                    PartName: part.name,
+                    SKU: part.sku || '-',
+                    CurrentStock: part.stockQuantity,
+                    MinStockLevel: part.minStockAlert,
+                    Difference: (part.minStockAlert || 0) - part.stockQuantity,
+                }));
+            setLowStockItemsReport(lowItems);
             break;
         }
         toast({ title: "Report Generated", description: `Data for ${reportType.replace(/([A-Z])/g, ' $1')} has been updated.` });
@@ -281,13 +301,13 @@ export default function ReportsPage() {
     return <div className="flex justify-center items-center h-screen"><p>Loading reports...</p></div>;
   }
 
-  const ReportCard: React.FC<{ title: string; description: string; reportKey: string; data: any[]; columns: { key: string; label: string }[]; children?: React.ReactNode; customFilters?: React.ReactNode; onExport?: () => void; }> = 
-    ({ title, description, reportKey, data, columns, children, customFilters, onExport }) => (
+  const ReportCard: React.FC<{ title: string; description: string; reportKey: string; data: any[]; columns: { key: string; label: string }[]; children?: React.ReactNode; customFilters?: React.ReactNode; onExport?: () => void; icon?: React.ReactNode }> = 
+    ({ title, description, reportKey, data, columns, children, customFilters, onExport, icon }) => (
     <Card className="shadow-md">
       <CardHeader>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <BarChart2 className="h-5 w-5 text-primary" />
+            {icon || <BarChart2 className="h-5 w-5 text-primary" />}
             <CardTitle className="text-xl">{title}</CardTitle>
           </div>
           {onExport && (
@@ -416,14 +436,30 @@ export default function ReportsPage() {
 
         <ReportCard
             title="Inventory Valuation Report"
-            description="Current valuation of your entire inventory. Not date dependent."
+            description="Current valuation of your entire inventory (based on cost or price if cost is unavailable). Not date dependent."
             reportKey="inventoryValuation"
             data={inventoryValuation.valuationDetails}
             columns={[{ key: 'PartName', label: 'Part Name'}, { key: 'SKU', label: 'SKU' }, { key: 'Stock', label: 'Stock' }, { key: 'UnitValue', label: 'Unit Value' }, { key: 'LineValue', label: 'Line Value' }]}
-            onExport={() => handleExportCSV(inventoryValuation.valuationDetails, "Inventory Valuation", ["Part Name", "SKU", "Stock Quantity", "Unit Value", "Total Line Value"])}
+            onExport={() => handleExportCSV(inventoryValuation.valuationDetails, "Inventory Valuation", ["Part Name", "SKU", "Stock Quantity", "Unit Value (Cost/Price)", "Total Line Value"])}
         >
             <p className="font-semibold text-lg mt-2">Total Inventory Value: {currencySymbol}{inventoryValuation.totalValue.toFixed(2)}</p>
         </ReportCard>
+
+        <ReportCard
+            title="Low Stock Items Report"
+            description="Lists all parts that are at or below their minimum stock alert level. Not date dependent."
+            reportKey="lowStockItems"
+            icon={<PackageWarning className="h-5 w-5 text-primary" />}
+            data={lowStockItemsReport}
+            columns={[
+                { key: 'PartName', label: 'Part Name'}, 
+                { key: 'SKU', label: 'SKU' }, 
+                { key: 'CurrentStock', label: 'Current Stock' }, 
+                { key: 'MinStockLevel', label: 'Min. Stock' },
+                { key: 'Difference', label: 'Needed' }
+            ]}
+            onExport={() => handleExportCSV(lowStockItemsReport, "Low Stock Items", ["Part Name", "SKU", "Current Stock", "Min. Stock Level", "Difference"])}
+        />
 
         <ReportCard
             title="Income Summary"
