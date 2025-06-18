@@ -29,19 +29,19 @@ import { DatePicker } from "@/components/ui/date-picker";
 import { PURCHASE_ORDER_STATUSES, PURCHASE_REQUISITION_STATUSES } from "@/lib/constants";
 
 const purchaseOrderItemSchema = z.object({
-  id: z.string(), 
-  partId: z.string().optional(), 
-  partName: z.string().optional(), 
+  id: z.string(),
+  partId: z.string().optional(),
+  partName: z.string().optional(),
   description: z.string().min(1, "Item description is required.").max(255),
   quantity: z.coerce.number().int().min(1, "Quantity must be at least 1."),
   unitPrice: z.coerce.number().min(0, "Unit price must be non-negative."),
-  totalPrice: z.coerce.number().min(0), 
+  totalPrice: z.coerce.number().min(0),
 });
 
 const purchaseOrderFormSchema = z.object({
   purchaseRequisitionId: z.string().optional(),
-  supplierId: z.string().min(1, "A supplier must be selected."),
-  supplierName: z.string(), 
+  supplierId: z.string().min(1, "A supplier must be selected.").optional(), // Allow undefined initially
+  supplierName: z.string().optional(),
   orderDate: z.date(),
   expectedDeliveryDate: z.date().optional(),
   items: z.array(purchaseOrderItemSchema).min(1, "At least one item is required."),
@@ -55,12 +55,11 @@ const purchaseOrderFormSchema = z.object({
 }).refine(data => {
   return data.items.every(item => {
       const calculatedTotalPrice = item.quantity * item.unitPrice;
-      // Use a small epsilon for floating point comparison
-      return Math.abs(calculatedTotalPrice - item.totalPrice) < 0.001; 
+      return Math.abs(calculatedTotalPrice - item.totalPrice) < 0.001;
   });
 }, {
   message: "Total price must match quantity * unit price for each item.",
-  path: ["items"], // You might want to target specific item's totalPrice field
+  path: ["items"],
 });
 
 type PurchaseOrderFormValues = z.infer<typeof purchaseOrderFormSchema>;
@@ -80,7 +79,7 @@ export default function NewPurchaseOrderPage() {
     return availableParts.map(part => ({
       value: part.id,
       label: `${part.name} (SKU: ${part.sku || 'N/A'}, Cost: ${currency}${part.cost?.toFixed(2) || part.price.toFixed(2)})`,
-      ...part, 
+      ...part,
     }));
   }, [availableParts, currency]);
 
@@ -88,7 +87,7 @@ export default function NewPurchaseOrderPage() {
     resolver: zodResolver(purchaseOrderFormSchema),
     defaultValues: {
       purchaseRequisitionId: undefined,
-      supplierId: "",
+      supplierId: undefined, // Changed from "" to undefined
       supplierName: "",
       orderDate: new Date(),
       expectedDeliveryDate: undefined,
@@ -111,7 +110,7 @@ export default function NewPurchaseOrderPage() {
   const selectedSupplierId = form.watch("supplierId");
 
   const loadPRItems = useCallback((prId: string) => {
-    if (typeof window !== 'undefined' && (window as any).__purchaseRequisitionStore) {
+    if (typeof window !== 'undefined' && (window as any).__purchaseRequisitionStore && availableParts.length > 0) {
       const pr = (window as any).__purchaseRequisitionStore.getRequisitionById(prId);
       if (pr) {
         const poItems: z.infer<typeof purchaseOrderItemSchema>[] = pr.items.map(prItem => {
@@ -119,7 +118,7 @@ export default function NewPurchaseOrderPage() {
           const unitPrice = selectedPart?.cost || selectedPart?.price || prItem.estimatedPricePerUnit || 0;
           const totalPrice = prItem.quantity * unitPrice;
           return {
-            id: prItem.id, // Use PR item ID as base or generate new for PO item
+            id: prItem.id,
             partId: prItem.partId || undefined,
             partName: prItem.partName || selectedPart?.name || "New Item",
             description: prItem.description || selectedPart?.name || "New Item Description",
@@ -133,7 +132,8 @@ export default function NewPurchaseOrderPage() {
         replaceItems([]);
       }
     }
-  }, [availableParts, replaceItems]); // availableParts must be stable or memoized correctly
+  }, [availableParts, replaceItems]);
+
 
   useEffect(() => {
     setIsMounted(true);
@@ -141,24 +141,26 @@ export default function NewPurchaseOrderPage() {
       if ((window as any).__supplierStore) setAvailableSuppliers((window as any).__supplierStore.suppliers.filter((s: Supplier) => s.isActive));
       if ((window as any).__inventoryStore) setAvailableParts((window as any).__inventoryStore.parts.filter((p: Part) => p.isActive));
       if ((window as any).__settingsStore) setShopSettings((window as any).__settingsStore.getSettings());
-
-      const requisitionId = searchParams.get("requisitionId");
-      if (requisitionId) {
-        form.setValue("purchaseRequisitionId", requisitionId);
-        // Ensure availableParts is loaded before calling loadPRItems if it depends on it
-        // This might require another useEffect that triggers loadPRItems when availableParts changes
-        // or ensuring stores are populated before this effect runs. For mock stores, it's tricky.
-        // For now, assuming availableParts is sufficiently populated at this point.
-        loadPRItems(requisitionId);
-      }
     }
-  }, [searchParams, loadPRItems, form]); // loadPRItems might need to be stable if included
+  }, []);
+
+  const purchaseRequisitionIdFromQuery = searchParams.get("requisitionId");
+  useEffect(() => {
+    if (isMounted && purchaseRequisitionIdFromQuery && availableParts.length > 0) {
+        if (!form.getValues("purchaseRequisitionId")) {
+            form.setValue("purchaseRequisitionId", purchaseRequisitionIdFromQuery);
+        }
+        loadPRItems(purchaseRequisitionIdFromQuery);
+    }
+  }, [isMounted, purchaseRequisitionIdFromQuery, availableParts, loadPRItems, form]);
 
 
   useEffect(() => {
     if (selectedSupplierId) {
       const supplier = availableSuppliers.find(s => s.id === selectedSupplierId);
       form.setValue("supplierName", supplier?.name || "");
+    } else {
+      form.setValue("supplierName", "");
     }
   }, [selectedSupplierId, availableSuppliers, form]);
 
@@ -176,18 +178,28 @@ export default function NewPurchaseOrderPage() {
   }, [subTotal, taxAmount, shippingCost]);
 
   function onSubmit(data: PurchaseOrderFormValues) {
+    if (!data.supplierId) {
+        toast({
+            title: "Supplier Required",
+            description: "Please select a supplier for the purchase order.",
+            variant: "destructive",
+        });
+        return;
+    }
     let newPurchaseOrder: PurchaseOrder | null = null;
     if (typeof window !== 'undefined' && (window as any).__purchaseOrderStore) {
       const poData: Omit<PurchaseOrder, 'id' | 'createdAt' | 'updatedAt' | 'subTotal' | 'grandTotal'> = {
         ...data,
+        supplierId: data.supplierId, // Ensure supplierId is passed
+        supplierName: data.supplierName || availableSuppliers.find(s => s.id === data.supplierId)?.name || "",
         items: data.items.map(item => ({
           ...item,
-          partId: item.partId || "", // Ensure partId is always a string or handle it if it's truly optional elsewhere
-          totalPrice: item.quantity * item.unitPrice, // Recalculate for safety
+          partId: item.partId || "", 
+          totalPrice: item.quantity * item.unitPrice, 
         })),
         taxAmount: data.taxAmount === '' ? undefined : Number(data.taxAmount),
         shippingCost: data.shippingCost === '' ? undefined : Number(data.shippingCost),
-        createdByUserId: "currentUserPlaceholder", // Replace with actual user ID
+        createdByUserId: "currentUserPlaceholder", 
       };
       newPurchaseOrder = (window as any).__purchaseOrderStore.addPurchaseOrder(poData);
     }
@@ -195,7 +207,7 @@ export default function NewPurchaseOrderPage() {
     if (newPurchaseOrder) {
       toast({
         title: "Purchase Order Created",
-        description: `PO #${newPurchaseOrder.id.substring(0,6)} to ${data.supplierName} has been created.`,
+        description: `PO #${newPurchaseOrder.id.substring(0,6)} to ${newPurchaseOrder.supplierName || data.supplierName} has been created.`,
       });
       router.push("/dashboard/purchase-orders");
     } else {
@@ -206,7 +218,7 @@ export default function NewPurchaseOrderPage() {
       });
     }
   }
-  
+
   if (!isMounted) {
     return <div className="flex justify-center items-center h-screen"><p>Loading form...</p></div>;
   }
@@ -239,7 +251,7 @@ export default function NewPurchaseOrderPage() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Supplier</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
+                      <Select onValueChange={field.onChange} value={field.value || ""}>
                         <FormControl><SelectTrigger><SelectValue placeholder="Select a Supplier" /></SelectTrigger></FormControl>
                         <SelectContent>
                           {availableSuppliers.length === 0 && <SelectItem value="loading" disabled>No active suppliers available.</SelectItem>}
@@ -328,16 +340,12 @@ export default function NewPurchaseOrderPage() {
                                     field.onChange(selectedValue);
                                     if (selectedOption) {
                                       form.setValue(`items.${index}.partName`, selectedOption.name);
-                                      form.setValue(`items.${index}.description`, selectedOption.label); // Using full label as description
+                                      form.setValue(`items.${index}.description`, selectedOption.label);
                                       form.setValue(`items.${index}.unitPrice`, selectedOption.cost || selectedOption.price || 0);
                                       const qty = form.getValues(`items.${index}.quantity`) || 1;
                                       form.setValue(`items.${index}.totalPrice`, qty * (selectedOption.cost || selectedOption.price || 0));
                                     } else {
                                        form.setValue(`items.${index}.partName`, "");
-                                       // Optionally clear description and price if part is de-selected
-                                       // form.setValue(`items.${index}.description`, "");
-                                       // form.setValue(`items.${index}.unitPrice`, 0);
-                                       // form.setValue(`items.${index}.totalPrice`, 0);
                                     }
                                   }}
                                   placeholder="Search for a part..."
@@ -386,12 +394,12 @@ export default function NewPurchaseOrderPage() {
                             <FormControl>
                             <div className="relative">
                                 <span className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground">{currency}</span>
-                                <Input 
-                                    type="number" 
-                                    step="0.01" 
-                                    placeholder="0.00" 
-                                    {...field} 
-                                    className="pl-7" 
+                                <Input
+                                    type="number"
+                                    step="0.01"
+                                    placeholder="0.00"
+                                    {...field}
+                                    className="pl-7"
                                     onChange={e => {
                                         const newUnitPrice = parseFloat(e.target.value) || 0;
                                         field.onChange(newUnitPrice);
@@ -414,12 +422,12 @@ export default function NewPurchaseOrderPage() {
                             <FormControl>
                             <div className="relative">
                                 <span className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground">{currency}</span>
-                                <Input 
-                                    type="number" 
-                                    step="0.01" 
-                                    placeholder="0.00" 
+                                <Input
+                                    type="number"
+                                    step="0.01"
+                                    placeholder="0.00"
                                     value={field.value?.toFixed(2) || "0.00"}
-                                    className="pl-7 bg-muted/50" 
+                                    className="pl-7 bg-muted/50"
                                     readOnly
                                 />
                             </div>
@@ -567,3 +575,5 @@ export default function NewPurchaseOrderPage() {
     </div>
   );
 }
+
+    
