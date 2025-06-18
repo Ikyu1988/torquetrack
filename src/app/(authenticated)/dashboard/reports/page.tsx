@@ -4,7 +4,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { FileText, BarChart2, DollarSign, Download, Filter, Search, PackageWarning } from "lucide-react";
+import { FileText, BarChart2, DollarSign, Download, Filter, Search, AlertTriangle } from "lucide-react";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
@@ -449,7 +449,7 @@ export default function ReportsPage() {
             title="Low Stock Items Report"
             description="Lists all parts that are at or below their minimum stock alert level. Not date dependent."
             reportKey="lowStockItems"
-            icon={<PackageWarning className="h-5 w-5 text-primary" />}
+            icon={<AlertTriangle className="h-5 w-5 text-primary" />}
             data={lowStockItemsReport}
             columns={[
                 { key: 'PartName', label: 'Part Name'}, 
