@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import type { JobOrder, Customer, Motorcycle, Mechanic, Payment, ShopSettings } from "@/types";
-import { ArrowLeft, ClipboardList, Edit, Printer, Send, UserCog, PackageSearch, Wrench, CreditCard, PlusCircle } from "lucide-react";
+import { ArrowLeft, ClipboardList, Edit, Printer, Send, UserCog, PackageSearch, Wrench, CreditCard, PlusCircle, ShoppingCart } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState, useMemo, useCallback } from "react";
@@ -15,7 +15,7 @@ import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { AddPaymentDialog } from "@/components/dashboard/job-orders/AddPaymentDialog";
-import { PAYMENT_STATUSES } from "@/lib/constants";
+import { JOB_ORDER_STATUSES, PAYMENT_STATUSES } from "@/lib/constants";
 
 if (typeof window !== 'undefined' && !(window as any).__paymentStore) {
     (window as any).__paymentStore = {
@@ -56,6 +56,7 @@ export default function ViewJobOrderPage() {
   const [shopSettings, setShopSettings] = useState<ShopSettings | null>(null); 
 
   const currency = useMemo(() => shopSettings?.currencySymbol || '₱', [shopSettings]);
+  const isDirectSale = useMemo(() => jobOrder?.status === JOB_ORDER_STATUSES.SALE_COMPLETED, [jobOrder]);
 
   const refreshJobOrderData = useCallback(() => {
     if (jobOrderId && isMounted) {
@@ -95,7 +96,7 @@ export default function ViewJobOrderPage() {
         } else {
             toast({
             title: "Error",
-            description: "Job Order not found.",
+            description: "Job Order/Sale not found.",
             variant: "destructive",
             });
             router.push("/dashboard/job-orders");
@@ -139,9 +140,9 @@ export default function ViewJobOrderPage() {
     }
 
     return (
-      <div className={cn("mb-2", className)}>
-        <p className="text-sm text-muted-foreground">{label}</p>
-        {typeof displayValue === 'string' ? <p className="font-medium">{displayValue}</p> : displayValue}
+      <div className={cn("mb-2 print:mb-1", className)}>
+        <p className="text-sm text-muted-foreground print:text-xs">{label}</p>
+        {typeof displayValue === 'string' ? <p className="font-medium print:text-sm">{displayValue}</p> : displayValue}
       </div>
     );
   };
@@ -161,11 +162,11 @@ export default function ViewJobOrderPage() {
 
 
   if (!isMounted || isLoading) {
-    return <div className="flex justify-center items-center h-screen"><p>Loading job order details...</p></div>;
+    return <div className="flex justify-center items-center h-screen"><p>Loading details...</p></div>;
   }
 
   if (!jobOrder) {
-    return <div className="flex justify-center items-center h-screen"><p>Job order not found.</p></div>;
+    return <div className="flex justify-center items-center h-screen"><p>Order/Sale not found.</p></div>;
   }
   
   const isFullyPaid = jobOrder.paymentStatus === PAYMENT_STATUSES.PAID || balanceDue <= 0.001; 
@@ -176,7 +177,7 @@ export default function ViewJobOrderPage() {
         <Button variant="outline" asChild>
           <Link href="/dashboard/job-orders">
             <ArrowLeft className="mr-2 h-4 w-4" />
-            Back to Job Orders
+            Back to Job Orders & Sales
           </Link>
         </Button>
         <div className="flex gap-2">
@@ -186,23 +187,21 @@ export default function ViewJobOrderPage() {
             <Button onClick={() => alert("Email functionality coming soon!")}>
                 <Send className="mr-2 h-4 w-4" /> Email to Customer
             </Button>
-            {jobOrder.status !== "Sale - Completed" && ( 
-                <Button asChild>
-                    <Link href={`/dashboard/job-orders/${jobOrder.id}/edit`}>
-                        <Edit className="mr-2 h-4 w-4" /> Edit Job Order
-                    </Link>
-                </Button>
-            )}
+            <Button asChild>
+                <Link href={`/dashboard/job-orders/${jobOrder.id}/edit`}>
+                    <Edit className="mr-2 h-4 w-4" /> Edit {isDirectSale ? "Sale" : "Job Order"}
+                </Link>
+            </Button>
         </div>
       </div>
 
       <Card className="shadow-lg">
         <CardHeader>
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between print:flex-row print:items-start">
             <div className="flex items-center gap-3">
-              <ClipboardList className="h-8 w-8 text-primary" />
+              {isDirectSale ? <ShoppingCart className="h-8 w-8 text-primary" /> : <ClipboardList className="h-8 w-8 text-primary" />}
               <div>
-                <CardTitle className="font-headline text-3xl">Job Order #{jobOrder.id.substring(0,6)}</CardTitle>
+                <CardTitle className="font-headline text-3xl">{isDirectSale ? "Direct Sale" : "Job Order"} #{jobOrder.id.substring(0,6)}</CardTitle>
                 <CardDescription>Created on: {format(new Date(jobOrder.createdAt), "PPP p")}</CardDescription>
               </div>
             </div>
@@ -214,7 +213,7 @@ export default function ViewJobOrderPage() {
         </CardHeader>
         <CardContent className="space-y-6">
         {jobOrder.customerId && customer && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className={cn("grid grid-cols-1 gap-6", jobOrder.motorcycleId && motorcycle ? "md:grid-cols-2" : "md:grid-cols-1")}>
             <Card>
               <CardHeader><CardTitle className="text-xl">Customer Details</CardTitle></CardHeader>
               <CardContent>
@@ -223,7 +222,7 @@ export default function ViewJobOrderPage() {
                 <DetailItem label="Email" value={customer?.email} />
               </CardContent>
             </Card>
-             {jobOrder.motorcycleId && motorcycle && (
+             {jobOrder.motorcycleId && motorcycle && !isDirectSale && (
                 <Card>
                 <CardHeader><CardTitle className="text-xl">Motorcycle Details</CardTitle></CardHeader>
                 <CardContent>
@@ -238,8 +237,13 @@ export default function ViewJobOrderPage() {
         )}
           
           <Separator />
-           <DetailItem label="Diagnostics / Customer Complaint / Sale Type" value={jobOrder.diagnostics} />
-          <Separator />
+           {(jobOrder.diagnostics && (!isDirectSale || jobOrder.diagnostics !== "Direct Parts Sale")) && (
+            <>
+              <DetailItem label={isDirectSale ? "Sale Type" : "Diagnostics / Customer Complaint"} value={jobOrder.diagnostics} />
+              <Separator />
+            </>
+           )}
+
 
           {jobOrder.servicesPerformed && jobOrder.servicesPerformed.length > 0 && (
             <Card>
@@ -270,7 +274,7 @@ export default function ViewJobOrderPage() {
                         ))}
                     </TableBody>
                     </Table>
-                <DetailItem label="Overall Service Notes" value={jobOrder.servicesDescription} className="mt-4" />
+                {jobOrder.servicesDescription && <DetailItem label="Overall Service Notes" value={jobOrder.servicesDescription} className="mt-4" />}
                 </CardContent>
             </Card>
           )}
@@ -305,7 +309,7 @@ export default function ViewJobOrderPage() {
                         ))}
                     </TableBody>
                     </Table>
-                <DetailItem label="Overall Parts Notes" value={jobOrder.partsDescription} className="mt-4" />
+                {jobOrder.partsDescription && <DetailItem label="Overall Parts Notes" value={jobOrder.partsDescription} className="mt-4" />}
                 </CardContent>
             </Card>
           )}
@@ -341,7 +345,7 @@ export default function ViewJobOrderPage() {
                 <CardHeader className="flex flex-row items-center justify-between">
                     <CardTitle className="text-xl">Payment Details</CardTitle>
                     {!isFullyPaid && (
-                        <Button size="sm" onClick={() => setShowAddPaymentDialog(true)}>
+                        <Button size="sm" onClick={() => setShowAddPaymentDialog(true)} className="print:hidden">
                             <PlusCircle className="mr-2 h-4 w-4"/> Add Payment
                         </Button>
                     )}
@@ -353,8 +357,12 @@ export default function ViewJobOrderPage() {
                         isBadge 
                         badgeVariant={jobOrder.paymentStatus === PAYMENT_STATUSES.PAID ? "default" : (jobOrder.paymentStatus === PAYMENT_STATUSES.UNPAID ? "destructive" : "secondary")} 
                     />
-                    <DetailItem label="Estimated Completion Date" value={jobOrder.estimatedCompletionDate} />
-                    <DetailItem label="Actual Completion Date" value={jobOrder.actualCompletionDate} />
+                    {!isDirectSale && jobOrder.estimatedCompletionDate && (
+                        <DetailItem label="Estimated Completion Date" value={jobOrder.estimatedCompletionDate} />
+                    )}
+                    {!isDirectSale && jobOrder.actualCompletionDate && (
+                        <DetailItem label="Actual Completion Date" value={jobOrder.actualCompletionDate} />
+                    )}
                     
                     {jobOrder.paymentHistory && jobOrder.paymentHistory.length > 0 && (
                         <>
@@ -413,4 +421,5 @@ export default function ViewJobOrderPage() {
       )}
     </div>
   );
-}
+
+    
