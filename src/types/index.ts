@@ -44,9 +44,11 @@ export interface Service {
   category?: string; // e.g., Electrical, Mechanical, Maintenance
   defaultLaborCost: number;
   estimatedHours?: number;
-  commissionType?: CommissionType;
+  commissionType?: CommissionType; // Optional: Can be undefined if no commission
   commissionValue?: number; // Amount for fixed, percentage for percentage
   isActive: boolean;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 export interface Part {
@@ -108,7 +110,7 @@ export interface JobOrder {
 export interface Mechanic {
   id: string;
   name: string;
-  specializations?: string; // Changed from string[] for simpler form handling
+  specializations?: string;
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -123,3 +125,4 @@ export interface Payment {
   notes?: string;
   processedByUserId: string;
 }
+

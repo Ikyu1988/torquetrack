@@ -1,3 +1,4 @@
+
 export const USER_ROLES = {
   ADMIN: 'Admin',
   CASHIER: 'Cashier',
@@ -31,3 +32,5 @@ export const COMMISSION_TYPES = {
 } as const;
 
 export type CommissionType = typeof COMMISSION_TYPES[keyof typeof COMMISSION_TYPES];
+export const COMMISSION_TYPE_OPTIONS = Object.values(COMMISSION_TYPES);
+
