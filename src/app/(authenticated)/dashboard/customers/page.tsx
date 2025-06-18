@@ -118,6 +118,8 @@ export default function CustomersPage() {
 
   // Periodically check for updates from the pseudo-store (e.g., after adding/editing)
   useEffect(() => {
+    if (!isMounted) return; // Ensure this runs only after mount
+
     const interval = setInterval(() => {
       if (typeof window !== 'undefined' && (window as any).__customerStore) {
         const storeCustomers = (window as any).__customerStore.customers;
@@ -127,7 +129,7 @@ export default function CustomersPage() {
       }
     }, 1000); // Check every second
     return () => clearInterval(interval);
-  }, [customers]);
+  }, [customers, isMounted]); // Added isMounted to dependencies
 
 
   const handleDeleteCustomer = (customer: Customer) => {
@@ -150,18 +152,9 @@ export default function CustomersPage() {
     setCustomerToDelete(null);
   };
   
-  if (!isMounted && typeof window !== 'undefined') {
-    // Initial load from store on client
-     if ((window as any).__customerStore) {
-      setCustomers([...(window as any).__customerStore.customers]);
-    }
-    setIsMounted(true);
-  }
-
-
   if (!isMounted) {
     // Or a loading skeleton
-    return <p>Loading customers...</p>; 
+    return <div className="flex justify-center items-center h-screen"><p>Loading customers...</p></div>; 
   }
 
 
@@ -250,3 +243,4 @@ export default function CustomersPage() {
     </div>
   );
 }
+

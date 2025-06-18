@@ -104,7 +104,7 @@ export default function MotorcyclesPage() {
       if ((window as any).__motorcycleStore) {
         setMotorcycles([...(window as any).__motorcycleStore.motorcycles]);
       }
-      if ((window as any).__customerStore) { // Assuming customer store exists for owner names
+      if ((window as any).__customerStore) { 
         setCustomers([...(window as any).__customerStore.customers]);
       }
     }
@@ -122,6 +122,8 @@ export default function MotorcyclesPage() {
   };
 
   useEffect(() => {
+    if (!isMounted) return; // Ensure this runs only after mount
+
     const interval = setInterval(() => {
       if (typeof window !== 'undefined' && (window as any).__motorcycleStore) {
         const storeMotorcycles = (window as any).__motorcycleStore.motorcycles;
@@ -131,7 +133,7 @@ export default function MotorcyclesPage() {
       }
     }, 1000);
     return () => clearInterval(interval);
-  }, [motorcycles]);
+  }, [motorcycles, isMounted]); // Added isMounted to dependencies
 
   const handleDeleteMotorcycle = (motorcycle: Motorcycle) => {
     setMotorcycleToDelete(motorcycle);
@@ -153,16 +155,6 @@ export default function MotorcyclesPage() {
     setMotorcycleToDelete(null);
   };
   
-  if (!isMounted && typeof window !== 'undefined') {
-     if ((window as any).__motorcycleStore) {
-      setMotorcycles([...(window as any).__motorcycleStore.motorcycles]);
-    }
-    if ((window as any).__customerStore) {
-        setCustomers([...(window as any).__customerStore.customers]);
-    }
-    setIsMounted(true);
-  }
-
   if (!isMounted) {
     return <div className="flex justify-center items-center h-screen"><p>Loading motorcycles...</p></div>;
   }
