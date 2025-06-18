@@ -25,6 +25,7 @@ import { useEffect, useState, useMemo } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { PURCHASE_REQUISITION_STATUSES, PURCHASE_REQUISITION_STATUS_OPTIONS } from "@/lib/constants";
+import { format } from "date-fns"; // Added this import
 
 const requisitionItemSchema = z.object({
   id: z.string(),
@@ -384,3 +385,4 @@ export default function EditPurchaseRequisitionPage() {
     </div>
   );
 }
+
