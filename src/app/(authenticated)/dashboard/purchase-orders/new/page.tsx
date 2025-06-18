@@ -29,8 +29,8 @@ import { PURCHASE_ORDER_STATUSES } from "@/lib/constants";
 
 const purchaseOrderItemSchema = z.object({
   id: z.string(), // Corresponds to PurchaseRequisitionItem.id, if from a PR
-  partId: z.string(),
-  partName: z.string(),
+  partId: z.string().optional(), // Optional: if selecting an existing part
+  partName: z.string().optional(), // Can be auto-filled or manually entered if new
   description: z.string().min(1, "Item description is required.").max(255),
   quantity: z.coerce.number().int().min(1, "Quantity must be at least 1."),
   unitPrice: z.coerce.number().min(0, "Unit price must be non-negative."),
@@ -52,10 +52,9 @@ const purchaseOrderFormSchema = z.object({
   status: z.nativeEnum(PURCHASE_ORDER_STATUSES).default(PURCHASE_ORDER_STATUSES.DRAFT),
   notes: z.string().max(1000).optional().or(z.literal('')),
 }).refine(data => {
-  // Validate that totalPrice matches quantity * unitPrice for each item
   return data.items.every(item => {
       const calculatedTotalPrice = item.quantity * item.unitPrice;
-      return Math.abs(calculatedTotalPrice - item.totalPrice) < 0.001; // Allow for minor floating point differences
+      return Math.abs(calculatedTotalPrice - item.totalPrice) < 0.001; 
   });
 }, {
   message: "Total price must match quantity * unit price for each item.",
@@ -63,6 +62,8 @@ const purchaseOrderFormSchema = z.object({
 });
 
 type PurchaseOrderFormValues = z.infer<typeof purchaseOrderFormSchema>;
+
+const NO_PART_SELECTED_VALUE = "__NO_PART_SELECTED__";
 
 export default function NewPurchaseOrderPage() {
   const { toast } = useToast();
@@ -105,15 +106,15 @@ export default function NewPurchaseOrderPage() {
     if (typeof window !== 'undefined' && (window as any).__purchaseRequisitionStore) {
       const pr = (window as any).__purchaseRequisitionStore.getRequisitionById(prId);
       if (pr) {
-        const poItems: PurchaseOrderItem[] = pr.items.map(prItem => {
+        const poItems: z.infer<typeof purchaseOrderItemSchema>[] = pr.items.map(prItem => {
           const selectedPart = availableParts.find(p => p.id === prItem.partId);
           const unitPrice = selectedPart?.cost || selectedPart?.price || prItem.estimatedPricePerUnit || 0;
           const totalPrice = prItem.quantity * unitPrice;
           return {
             id: prItem.id,
-            partId: prItem.partId || "NEW_ITEM",
-            partName: prItem.partName || "New Item",
-            description: prItem.description,
+            partId: prItem.partId || NO_PART_SELECTED_VALUE,
+            partName: prItem.partName || selectedPart?.name || "New Item",
+            description: prItem.description || selectedPart?.name || "New Item Description",
             quantity: prItem.quantity,
             unitPrice: unitPrice,
             totalPrice: totalPrice,
@@ -130,7 +131,7 @@ export default function NewPurchaseOrderPage() {
     setIsMounted(true);
     if (typeof window !== 'undefined') {
       if ((window as any).__supplierStore) setAvailableSuppliers((window as any).__supplierStore.suppliers.filter((s: Supplier) => s.isActive));
-      if ((window as any).__inventoryStore) setAvailableParts((window as any).__inventoryStore.parts);
+      if ((window as any).__inventoryStore) setAvailableParts((window as any).__inventoryStore.parts.filter((p: Part) => p.isActive));
       if ((window as any).__settingsStore) setShopSettings((window as any).__settingsStore.getSettings());
 
       const requisitionId = searchParams.get("requisitionId");
@@ -151,7 +152,7 @@ export default function NewPurchaseOrderPage() {
 
   const itemsWatch = form.watch("items");
   const subTotal = useMemo(() => {
-    return itemsWatch.reduce((sum, item) => sum + item.totalPrice, 0);
+    return itemsWatch.reduce((sum, item) => sum + (item.totalPrice || 0) , 0);
   }, [itemsWatch]);
 
   const taxAmount = form.watch("taxAmount");
@@ -169,11 +170,12 @@ export default function NewPurchaseOrderPage() {
         ...data,
         items: data.items.map(item => ({
           ...item,
-          totalPrice: item.quantity * item.unitPrice, // Ensure total price is always recalculated
+          partId: item.partId === NO_PART_SELECTED_VALUE ? "" : item.partId || "", // Ensure partId is string or empty
+          totalPrice: item.quantity * item.unitPrice,
         })),
-        taxAmount: data.taxAmount === '' ? undefined : data.taxAmount,
-        shippingCost: data.shippingCost === '' ? undefined : data.shippingCost,
-        createdByUserId: "currentUserPlaceholder", // Replace with actual user ID
+        taxAmount: data.taxAmount === '' ? undefined : Number(data.taxAmount),
+        shippingCost: data.shippingCost === '' ? undefined : Number(data.shippingCost),
+        createdByUserId: "currentUserPlaceholder",
       };
       newPurchaseOrder = (window as any).__purchaseOrderStore.addPurchaseOrder(poData);
     }
@@ -260,13 +262,31 @@ export default function NewPurchaseOrderPage() {
                     </FormItem>
                   )}
                 />
+                 <FormField
+                  control={form.control}
+                  name="status"
+                  render={({ field }) => (
+                  <FormItem>
+                      <FormLabel>Status</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value}>
+                      <FormControl><SelectTrigger><SelectValue placeholder="Select status" /></SelectTrigger></FormControl>
+                      <SelectContent>
+                          {Object.values(PURCHASE_ORDER_STATUSES).map(option => (
+                            <SelectItem key={option} value={option}>{option}</SelectItem>
+                          ))}
+                      </SelectContent>
+                      </Select>
+                      <FormMessage />
+                  </FormItem>
+                  )}
+                />
               </div>
               <FormField
                 control={form.control}
                 name="supplierName"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Supplier</FormLabel>
+                    <FormLabel>Selected Supplier</FormLabel>
                     <FormControl><Input {...field} readOnly className="bg-muted/50" /></FormControl>
                   </FormItem>
                 )}
@@ -276,21 +296,53 @@ export default function NewPurchaseOrderPage() {
               <div className="space-y-4">
                 <div className="flex justify-between items-center">
                   <h3 className="text-lg font-medium">Order Items</h3>
-                  <Button type="button" variant="outline" size="sm" onClick={() => appendItem({ id: Date.now().toString(), partId: "NEW_ITEM", partName: "New Item", description: "", quantity: 1, unitPrice: 0, totalPrice: 0 })}>
+                  <Button type="button" variant="outline" size="sm" onClick={() => appendItem({ id: Date.now().toString(), partId: NO_PART_SELECTED_VALUE, partName: "", description: "", quantity: 1, unitPrice: 0, totalPrice: 0 })}>
                     <PlusCircle className="mr-2 h-4 w-4" /> Add Item
                   </Button>
                 </div>
                 {itemFields.map((item, index) => (
                   <Card key={item.id} className="p-4 space-y-4 bg-muted/30">
                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
-                       
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
+                        <FormField
+                            control={form.control}
+                            name={`items.${index}.partId`}
+                            render={({ field }) => (
+                            <FormItem className="md:col-span-1">
+                                <FormLabel>Select Existing Part (Optional)</FormLabel>
+                                <Select 
+                                onValueChange={(value) => {
+                                    field.onChange(value);
+                                    const selectedPart = availableParts.find(p => p.id === value);
+                                    if (selectedPart) {
+                                        form.setValue(`items.${index}.partName`, selectedPart.name);
+                                        form.setValue(`items.${index}.description`, selectedPart.name + (selectedPart.brand ? ` (${selectedPart.brand})` : ''));
+                                        form.setValue(`items.${index}.unitPrice`, selectedPart.cost || selectedPart.price || 0);
+                                        const qty = form.getValues(`items.${index}.quantity`) || 1;
+                                        form.setValue(`items.${index}.totalPrice`, qty * (selectedPart.cost || selectedPart.price || 0));
+                                    } else if (value === NO_PART_SELECTED_VALUE) {
+                                        form.setValue(`items.${index}.partName`, "");
+                                        // Keep description and unitPrice as they are for manual entry
+                                    }
+                                }} 
+                                value={field.value || NO_PART_SELECTED_VALUE}
+                                >
+                                <FormControl><SelectTrigger><SelectValue placeholder="Select existing part or enter manually" /></SelectTrigger></FormControl>
+                                <SelectContent>
+                                    <SelectItem value={NO_PART_SELECTED_VALUE}>-- Enter Manually --</SelectItem>
+                                    {availableParts.map(part => (
+                                    <SelectItem key={part.id} value={part.id}>{part.name} (SKU: {part.sku || 'N/A'})</SelectItem>
+                                    ))}
+                                </SelectContent>
+                                </Select>
+                                <FormMessage />
+                            </FormItem>
+                            )}
+                        />
                          <FormField
                             control={form.control}
                             name={`items.${index}.description`}
                             render={({ field }) => (
-                            <FormItem className="md:col-span-3">
+                            <FormItem className="md:col-span-2">
                                 <FormLabel>Item Description</FormLabel>
                                 <FormControl><Input placeholder="Detailed description of item" {...field} /></FormControl>
                                 <FormMessage />
@@ -356,7 +408,7 @@ export default function NewPurchaseOrderPage() {
                                     type="number" 
                                     step="0.01" 
                                     placeholder="0.00" 
-                                    {...field} 
+                                    value={field.value?.toFixed(2) || "0.00"}
                                     className="pl-7 bg-muted/50" 
                                     readOnly
                                 />
@@ -372,7 +424,13 @@ export default function NewPurchaseOrderPage() {
                     </Button>
                   </Card>
                 ))}
+                {form.formState.errors.items && !form.formState.errors.items.root && itemFields.length > 0 && (
+                    <p className="text-sm font-medium text-destructive">{form.formState.errors.items.message}</p>
+                )}
                 {itemFields.length === 0 && ( <p className="text-sm text-muted-foreground p-4 text-center">No items added yet.</p>)}
+                 {form.formState.errors.items?.root && (
+                    <p className="text-sm font-medium text-destructive text-center">{form.formState.errors.items.root.message}</p>
+                )}
               </div>
               <Separator />
 
@@ -386,7 +444,7 @@ export default function NewPurchaseOrderPage() {
                         <FormControl>
                             <div className="relative">
                                 <span className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground">{currency}</span>
-                                <Input type="number" step="0.01" placeholder="0.00" {...field} className="pl-7" />
+                                <Input type="number" step="0.01" placeholder="0.00" {...field} className="pl-7" onChange={e => field.onChange(e.target.value === '' ? '' : parseFloat(e.target.value) || 0)} />
                             </div>
                         </FormControl>
                         <FormMessage />
@@ -402,7 +460,7 @@ export default function NewPurchaseOrderPage() {
                         <FormControl>
                             <div className="relative">
                                 <span className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground">{currency}</span>
-                                <Input type="number" step="0.01" placeholder="0.00" {...field} className="pl-7" />
+                                <Input type="number" step="0.01" placeholder="0.00" {...field} className="pl-7" onChange={e => field.onChange(e.target.value === '' ? '' : parseFloat(e.target.value) || 0)} />
                             </div>
                         </FormControl>
                         <FormMessage />
@@ -464,7 +522,7 @@ export default function NewPurchaseOrderPage() {
               />
 
               <Card className="bg-muted/20 p-4">
-                <div className="flex justify-between items-center">
+                <div className="flex justify-between items-center flex-wrap gap-4">
                     <div>
                         <div className="text-sm text-muted-foreground">Subtotal:</div>
                         <div className="text-xl font-bold">{currency}{subTotal.toFixed(2)}</div>
@@ -477,8 +535,8 @@ export default function NewPurchaseOrderPage() {
                         <div className="text-sm text-muted-foreground">Tax:</div>
                         <div className="text-xl font-bold">{currency}{(Number(taxAmount) || 0).toFixed(2)}</div>
                     </div>
-                    <div>
-                        <div className="text-sm text-muted-foreground">Total:</div>
+                    <div className="text-right">
+                        <div className="text-sm text-muted-foreground">Grand Total:</div>
                         <div className="text-2xl font-bold text-primary">{currency}{grandTotal.toFixed(2)}</div>
                     </div>
                 </div>
@@ -499,3 +557,6 @@ export default function NewPurchaseOrderPage() {
     </div>
   );
 }
+
+
+    
