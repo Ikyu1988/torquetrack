@@ -1,10 +1,11 @@
+
 "use client";
 
 import { UserNav } from "@/components/navigation/UserNav";
 import { Button }  from "@/components/ui/button";
 import { Menu } from "lucide-react";
 import { usePathname } from "next/navigation";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"; // Added SheetHeader, SheetTitle
 import { SidebarNav } from "@/components/navigation/SidebarNav";
 import { AppLogo } from "./AppLogo";
 
@@ -25,6 +26,11 @@ export function AppHeader({ toggleSidebar, isSidebarCollapsed }: { toggleSidebar
             </Button>
           </SheetTrigger>
           <SheetContent side="left" className="p-0 flex flex-col">
+            <SheetHeader className="p-4 border-b h-[65px] flex items-center"> {/* Added SheetHeader */}
+              <SheetTitle>
+                <AppLogo /> {/* Using AppLogo as a visually prominent title element */}
+              </SheetTitle>
+            </SheetHeader>
             <SidebarNav />
           </SheetContent>
         </Sheet>
