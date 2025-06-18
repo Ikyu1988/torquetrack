@@ -4,7 +4,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { FileText, BarChart2, DollarSign, Download, Filter, Search, AlertTriangle, ShoppingBag, ClipboardList } from "lucide-react";
+import { FileText, BarChart2, DollarSign, Download, Filter, AlertTriangle, ShoppingBag, ClipboardList } from "lucide-react";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
@@ -575,6 +575,5 @@ export default function ReportsPage() {
     </div>
   );
 }
-
 
     
