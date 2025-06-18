@@ -17,7 +17,6 @@ import {
   Truck, // For Suppliers
   FilePlus, // For Purchase Requisitions
   Receipt, // For Purchase Orders
-  Archive, // For Goods Receipts
   ArchiveRestore // For Goods Receipts
 } from "lucide-react";
 import { cn } from "@/lib/utils";

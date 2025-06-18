@@ -17,7 +17,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Settings as SettingsIcon, Building, DollarSign, Palette, ToggleLeft, Image as ImageIcon, AlertTriangle, Database } from "lucide-react";
+import { Settings as SettingsIcon, Building, DollarSign, Palette, ToggleLeft, Image as ImageIcon, AlertTriangle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { ShopSettings, ModuleSettings } from "@/types";
 import { useEffect, useState, useCallback } from "react";
