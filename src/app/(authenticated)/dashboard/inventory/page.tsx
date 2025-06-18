@@ -4,7 +4,7 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { PlusCircle, Package, Pencil, Trash2, Download, Upload } from "lucide-react";
+import { PlusCircle, Package, Pencil, Trash2, Download, Upload, AlertTriangle } from "lucide-react";
 import Link from "next/link";
 import {
   Table,
@@ -27,6 +27,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import type { Part, ShopSettings } from "@/types";
 import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 
 const initialParts: Part[] = [
   {
@@ -75,6 +76,36 @@ const initialParts: Part[] = [
     createdAt: new Date(),
     updatedAt: new Date(),
     notes: "Sintered brake pads"
+  },
+   {
+    id: "part4",
+    name: "Chain Lube Maxima",
+    brand: "Maxima",
+    category: "Maintenance",
+    sku: "CHN-MAX-LUBE",
+    price: 18.00,
+    cost: 9.00,
+    supplier: "BikeParts Direct",
+    stockQuantity: 3, // Low stock example
+    minStockAlert: 5,
+    isActive: true,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  },
+  {
+    id: "part5",
+    name: "Air Filter OEM",
+    brand: "OEM Replacement",
+    category: "Engine",
+    sku: "AIR-OEM-STD",
+    price: 22.00,
+    cost: 11.00,
+    supplier: "MotoSupplies Inc.",
+    stockQuantity: 0, // Out of stock example
+    minStockAlert: 3,
+    isActive: true,
+    createdAt: new Date(),
+    updatedAt: new Date(),
   },
 ];
 
@@ -273,15 +304,13 @@ export default function InventoryPage() {
             const valueStr = values[mapping.index]?.trim();
              if (valueStr === undefined || valueStr === "") {
                 if (!mapping.optional && (mapping.type === 'number' || mapping.type === 'integer' || mapping.type === 'boolean')) {
-                    // Required numeric/boolean fields cannot be empty, mark row as invalid
                     if (mapping.targetKey === 'price' || mapping.targetKey === 'stockQuantity' || mapping.targetKey === 'isActive') {
                         rowIsValid = false;
                     }
                 }
-                partData[mapping.targetKey] = undefined; // Set as undefined for optional empty strings
+                partData[mapping.targetKey] = undefined; 
                 return;
             }
-
 
             try {
                 switch (mapping.type) {
@@ -311,7 +340,7 @@ export default function InventoryPage() {
                         } else if (lowerVal === 'false' || lowerVal === '0') {
                             partData[mapping.targetKey] = false;
                         } else {
-                             if (!mapping.optional) rowIsValid = false; else partData[mapping.targetKey] = undefined; // Or default to false/true
+                             if (!mapping.optional) rowIsValid = false; else partData[mapping.targetKey] = undefined;
                         }
                         break;
                 }
@@ -323,7 +352,6 @@ export default function InventoryPage() {
         if (partData.name === undefined || partData.price === undefined || partData.stockQuantity === undefined || partData.isActive === undefined) {
             rowIsValid = false; 
         }
-
 
         if (rowIsValid && (window as any).__inventoryStore) {
           (window as any).__inventoryStore.addPart(partData as Omit<Part, 'id' | 'createdAt' | 'updatedAt'>);
@@ -400,38 +428,48 @@ export default function InventoryPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {parts.map((part) => (
-                  <TableRow key={part.id}>
-                    <TableCell className="font-medium">{part.name}</TableCell>
-                    <TableCell>{part.sku || "-"}</TableCell>
-                    <TableCell>{part.brand || "-"}</TableCell>
-                    <TableCell>{part.category || "-"}</TableCell>
-                    <TableCell className="text-right">{currency}{part.price.toFixed(2)}</TableCell>
-                    <TableCell className="text-right">{part.stockQuantity}</TableCell>
-                    <TableCell>
-                      <Badge variant={part.isActive ? "default" : "secondary"}>
-                        {part.isActive ? "Active" : "Inactive"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button variant="ghost" size="icon" asChild className="hover:text-primary">
-                        <Link href={`/dashboard/inventory/${part.id}/edit`}>
-                          <Pencil className="h-4 w-4" />
-                          <span className="sr-only">Edit</span>
-                        </Link>
-                      </Button>
-                      <Button 
-                        variant="ghost" 
-                        size="icon" 
-                        className="hover:text-destructive"
-                        onClick={() => handleDeletePart(part)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                        <span className="sr-only">Delete</span>
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {parts.map((part) => {
+                  const isLowStock = part.isActive && part.minStockAlert !== undefined && part.stockQuantity <= part.minStockAlert && part.stockQuantity > 0;
+                  const isOutOfStock = part.isActive && part.stockQuantity === 0;
+                  return (
+                    <TableRow key={part.id} className={cn(isOutOfStock ? "bg-destructive/10" : isLowStock ? "bg-yellow-500/10" : "")}>
+                      <TableCell className="font-medium">{part.name}</TableCell>
+                      <TableCell>{part.sku || "-"}</TableCell>
+                      <TableCell>{part.brand || "-"}</TableCell>
+                      <TableCell>{part.category || "-"}</TableCell>
+                      <TableCell className="text-right">{currency}{part.price.toFixed(2)}</TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          {part.stockQuantity}
+                          {isOutOfStock && <Badge variant="destructive" className="text-xs">Out of Stock</Badge>}
+                          {isLowStock && <Badge variant="outline" className="border-yellow-500 text-yellow-600 text-xs">Low Stock</Badge>}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={part.isActive ? "default" : "secondary"}>
+                          {part.isActive ? "Active" : "Inactive"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button variant="ghost" size="icon" asChild className="hover:text-primary">
+                          <Link href={`/dashboard/inventory/${part.id}/edit`}>
+                            <Pencil className="h-4 w-4" />
+                            <span className="sr-only">Edit</span>
+                          </Link>
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="hover:text-destructive"
+                          onClick={() => handleDeletePart(part)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                          <span className="sr-only">Delete</span>
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           ) : (
@@ -463,4 +501,3 @@ export default function InventoryPage() {
     </div>
   );
 }
-
