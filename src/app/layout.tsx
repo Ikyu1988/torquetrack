@@ -1,3 +1,4 @@
+
 import type { Metadata } from 'next';
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
@@ -20,18 +21,42 @@ export const metadata: Metadata = {
   description: 'Efficiently manage your motorcycle shop with TorqueTrack.',
 };
 
+// Script to apply theme from localStorage before hydration
+const ApplyThemeScript = () => (
+  <script
+    dangerouslySetInnerHTML={{
+      __html: `
+        (function() {
+          try {
+            const theme = localStorage.getItem('theme');
+            if (theme) {
+              document.documentElement.classList.add(theme);
+            } else {
+              // Default to dark if no theme is set in localStorage
+              document.documentElement.classList.add('dark'); 
+              localStorage.setItem('theme', 'dark');
+            }
+          } catch (e) {
+            // If localStorage is not available, default to dark
+            document.documentElement.classList.add('dark');
+            console.error('Error accessing localStorage for theme:', e);
+          }
+        })();
+      `,
+    }}
+  />
+);
+
+
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark" suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning>
       <head>
-        {/* Existing Google Fonts links if any, can be removed if using next/font exclusively */}
-        {/* <link rel="preconnect" href="https://fonts.googleapis.com" /> */}
-        {/* <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" /> */}
-        {/* <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@300;400;500;700&display=swap" rel="stylesheet" /> */}
+        <ApplyThemeScript />
       </head>
       <body 
         className={cn(

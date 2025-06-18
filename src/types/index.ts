@@ -136,12 +136,23 @@ export interface Mechanic {
   updatedAt: Date;
 }
 
+export interface ModuleSettings {
+  reportsEnabled?: boolean;
+  directSalesEnabled?: boolean;
+  // Add more modules as needed
+}
+
 export interface ShopSettings {
   shopName: string;
   shopAddress?: string;
   shopPhone?: string;
   shopEmail?: string;
+  shopLogoUrl?: string; // URL to the logo, actual upload not handled
   currencySymbol: string; 
   defaultTaxRate?: number; // as a percentage, e.g., 10 for 10%
+  defaultLaborRate?: number; // Default hourly labor rate for the shop
+  theme: 'light' | 'dark'; // Theme preference
+  moduleSettings?: ModuleSettings;
   updatedAt?: Date;
 }
+
