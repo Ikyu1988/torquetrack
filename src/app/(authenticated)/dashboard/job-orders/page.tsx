@@ -30,6 +30,12 @@ import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { PAYMENT_STATUSES, JOB_ORDER_STATUSES } from "@/lib/constants";
 
+const today = new Date();
+const yesterday = new Date(today);
+yesterday.setDate(today.getDate() - 1);
+const fiveDaysAgo = new Date(today);
+fiveDaysAgo.setDate(today.getDate() - 5);
+
 const initialJobOrders: JobOrder[] = [
   {
     id: "jo1",
@@ -49,10 +55,10 @@ const initialJobOrders: JobOrder[] = [
     paymentStatus: PAYMENT_STATUSES.UNPAID,
     amountPaid: 0,
     paymentHistory: [],
-    createdAt: new Date(2023, 10, 15),
-    updatedAt: new Date(2023, 10, 16),
+    createdAt: fiveDaysAgo, // Updated to be recent
+    updatedAt: fiveDaysAgo, // Updated
     createdByUserId: "user123",
-    estimatedCompletionDate: new Date(2023, 10, 17),
+    estimatedCompletionDate: new Date(new Date().setDate(new Date().getDate() + 2)), // 2 days from now
   },
   {
     id: "jo2",
@@ -72,12 +78,12 @@ const initialJobOrders: JobOrder[] = [
     paymentStatus: PAYMENT_STATUSES.PAID,
     amountPaid: 537.50,
     paymentHistory: [
-        { id: "pay1", jobOrderId: "jo2", amount: 537.50, paymentDate: new Date(2023, 11, 3), method: "Credit Card", processedByUserId: "user456", createdAt: new Date(2023, 11, 3), notes: "Paid in full via CC" }
+        { id: "pay1", jobOrderId: "jo2", amount: 537.50, paymentDate: yesterday, method: "Credit Card", processedByUserId: "user456", createdAt: yesterday, notes: "Paid in full via CC" } // Updated paymentDate
     ],
-    createdAt: new Date(2023, 11, 1),
-    updatedAt: new Date(2023, 11, 3),
+    createdAt: yesterday, // Updated to be recent
+    updatedAt: yesterday, // Updated
     createdByUserId: "user456",
-    actualCompletionDate: new Date(2023, 11, 3),
+    actualCompletionDate: yesterday, // Updated
   },
 ];
 
