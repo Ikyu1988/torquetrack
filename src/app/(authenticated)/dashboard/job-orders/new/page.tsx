@@ -143,11 +143,19 @@ export default function NewJobOrderPage() {
   }, [selectedCustomerId, motorcycles]);
   
   useEffect(() => {
-    if (selectedCustomerId && form.getValues("motorcycleId")) {
-        const currentMotorcycle = motorcycles.find(m => m.id === form.getValues("motorcycleId"));
-        if (currentMotorcycle && currentMotorcycle.customerId !== selectedCustomerId) {
-            form.setValue("motorcycleId", "");
+    if (selectedCustomerId) {
+        const customerMotorcycles = motorcycles.filter(m => m.customerId === selectedCustomerId);
+        if (customerMotorcycles.length === 1) {
+            form.setValue("motorcycleId", customerMotorcycles[0].id);
+        } else if (form.getValues("motorcycleId")) {
+            // If customer changes and current motorcycle doesn't belong to new customer, clear it
+            const currentMotorcycle = motorcycles.find(m => m.id === form.getValues("motorcycleId"));
+            if (currentMotorcycle && currentMotorcycle.customerId !== selectedCustomerId) {
+                form.setValue("motorcycleId", "");
+            }
         }
+    } else {
+      form.setValue("motorcycleId", ""); // Clear motorcycle if customer is cleared
     }
   }, [selectedCustomerId, form, motorcycles]);
 

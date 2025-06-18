@@ -4,7 +4,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { PlusCircle, FilePlus, Pencil, Trash2, Eye } from "lucide-react";
+import { PlusCircle, FilePlus, Pencil, Trash2, Eye, Search } from "lucide-react";
 import Link from "next/link";
 import {
   Table,
@@ -28,18 +28,21 @@ import { useToast } from "@/hooks/use-toast";
 import type { PurchaseRequisition, ShopSettings } from "@/types";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
-import { PURCHASE_REQUISITION_STATUSES } from "@/lib/constants";
+import { PURCHASE_REQUISITION_STATUSES, PURCHASE_REQUISITION_STATUS_OPTIONS } from "@/lib/constants";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
 
 const initialRequisitions: PurchaseRequisition[] = [
   {
     id: "pr1",
-    requestedByUserId: "user123", // Placeholder
+    requestedByUserId: "user123", 
     status: PURCHASE_REQUISITION_STATUSES.PENDING_APPROVAL,
     items: [
       { id: "pri1", description: "Bulk Spark Plugs NGK BKR6E", quantity: 100, estimatedPricePerUnit: 10 },
       { id: "pri2", description: "Shop Towels (Case of 500)", quantity: 5 },
     ],
-    totalEstimatedValue: 1100, // Example
+    totalEstimatedValue: 1100, 
     submittedDate: new Date(new Date().setDate(new Date().getDate() - 2)),
     createdAt: new Date(new Date().setDate(new Date().getDate() - 2)),
     updatedAt: new Date(new Date().setDate(new Date().getDate() - 2)),
@@ -101,7 +104,9 @@ if (typeof window !== 'undefined') {
 
 export default function PurchaseRequisitionsPage() {
   const { toast } = useToast();
-  const [requisitions, setRequisitions] = useState<PurchaseRequisition[]>([]);
+  const [allRequisitions, setAllRequisitions] = useState<PurchaseRequisition[]>([]);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState<PurchaseRequisitionStatus | "ALL">("ALL");
   const [shopSettings, setShopSettings] = useState<ShopSettings | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [requisitionToDelete, setRequisitionToDelete] = useState<PurchaseRequisition | null>(null);
@@ -113,7 +118,7 @@ export default function PurchaseRequisitionsPage() {
     setIsMounted(true);
     if (typeof window !== 'undefined') {
       if ((window as any).__purchaseRequisitionStore) {
-        setRequisitions([...(window as any).__purchaseRequisitionStore.requisitions]);
+        setAllRequisitions([...(window as any).__purchaseRequisitionStore.requisitions]);
       }
        if ((window as any).__settingsStore) {
         setShopSettings((window as any).__settingsStore.getSettings());
@@ -123,7 +128,7 @@ export default function PurchaseRequisitionsPage() {
 
   const refreshRequisitions = () => {
     if (typeof window !== 'undefined' && (window as any).__purchaseRequisitionStore) {
-      setRequisitions([...(window as any).__purchaseRequisitionStore.requisitions]);
+      setAllRequisitions([...(window as any).__purchaseRequisitionStore.requisitions]);
     }
   };
 
@@ -132,13 +137,13 @@ export default function PurchaseRequisitionsPage() {
     const interval = setInterval(() => {
       if (typeof window !== 'undefined' && (window as any).__purchaseRequisitionStore) {
         const storeRequisitions = (window as any).__purchaseRequisitionStore.requisitions;
-        if (JSON.stringify(storeRequisitions) !== JSON.stringify(requisitions)) {
+        if (JSON.stringify(storeRequisitions) !== JSON.stringify(allRequisitions)) {
           refreshRequisitions();
         }
       }
     }, 1000);
     return () => clearInterval(interval);
-  }, [requisitions, isMounted]);
+  }, [allRequisitions, isMounted]);
 
   const handleDeleteRequisition = (requisition: PurchaseRequisition) => {
     if (requisition.status === PURCHASE_REQUISITION_STATUSES.ORDERED) {
@@ -164,6 +169,23 @@ export default function PurchaseRequisitionsPage() {
     setRequisitionToDelete(null);
   };
   
+  const filteredRequisitions = useMemo(() => {
+    let filtered = allRequisitions;
+    if (statusFilter !== "ALL") {
+      filtered = filtered.filter(req => req.status === statusFilter);
+    }
+    if (searchTerm) {
+      const lowerSearchTerm = searchTerm.toLowerCase();
+      filtered = filtered.filter(req =>
+        req.id.toLowerCase().includes(lowerSearchTerm) ||
+        (req.requestedByUserId && req.requestedByUserId.toLowerCase().includes(lowerSearchTerm)) ||
+        (req.department && req.department.toLowerCase().includes(lowerSearchTerm)) ||
+        req.items.some(item => item.description.toLowerCase().includes(lowerSearchTerm) || (item.partName && item.partName.toLowerCase().includes(lowerSearchTerm)))
+      );
+    }
+    return filtered;
+  }, [allRequisitions, searchTerm, statusFilter]);
+
   if (!isMounted) {
     return <div className="flex justify-center items-center h-screen"><p>Loading purchase requisitions...</p></div>;
   }
@@ -171,7 +193,7 @@ export default function PurchaseRequisitionsPage() {
   return (
     <div className="flex flex-col gap-6">
       <Card className="shadow-lg">
-        <CardHeader className="flex flex-row items-center justify-between">
+        <CardHeader className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-3">
               <FilePlus className="h-6 w-6 text-primary" />
@@ -179,14 +201,35 @@ export default function PurchaseRequisitionsPage() {
             </div>
             <CardDescription>Manage internal requests for parts and supplies.</CardDescription>
           </div>
-          <Button asChild>
-            <Link href="/dashboard/purchase-requisitions/new">
-              <PlusCircle className="mr-2 h-4 w-4" /> Create New Requisition
-            </Link>
-          </Button>
+          <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
+            <div className="relative w-full sm:w-auto md:w-48">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                type="search"
+                placeholder="Search requisitions..."
+                className="pl-8 w-full"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+            <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as PurchaseRequisitionStatus | "ALL")}>
+              <SelectTrigger className="w-full sm:w-auto md:w-[180px]">
+                <SelectValue placeholder="Filter by status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">All Statuses</SelectItem>
+                {PURCHASE_REQUISITION_STATUS_OPTIONS.map(status => <SelectItem key={status} value={status}>{status}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <Button asChild className="w-full sm:w-auto">
+              <Link href="/dashboard/purchase-requisitions/new">
+                <PlusCircle className="mr-2 h-4 w-4" /> Create New Requisition
+              </Link>
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
-          {requisitions.length > 0 ? (
+          {filteredRequisitions.length > 0 ? (
             <Table>
               <TableHeader>
                 <TableRow>
@@ -200,7 +243,7 @@ export default function PurchaseRequisitionsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {requisitions.map((req) => (
+                {filteredRequisitions.map((req) => (
                   <TableRow key={req.id}>
                     <TableCell className="font-medium">{`#${req.id.substring(0,6)}`}</TableCell>
                     <TableCell>{req.requestedByUserId || "N/A"}</TableCell>
@@ -242,8 +285,8 @@ export default function PurchaseRequisitionsPage() {
           ) : (
             <div className="flex flex-col items-center justify-center gap-4 py-10 text-muted-foreground">
                 <FilePlus className="h-16 w-16" />
-                <p className="text-lg">No purchase requisitions found.</p>
-                <p>Get started by creating a new requisition.</p>
+                <p className="text-lg">{searchTerm || statusFilter !== "ALL" ? "No requisitions match your criteria." : "No purchase requisitions found."}</p>
+                {!(searchTerm || statusFilter !== "ALL") &&  <p>Get started by creating a new requisition.</p>}
             </div>
           )}
         </CardContent>

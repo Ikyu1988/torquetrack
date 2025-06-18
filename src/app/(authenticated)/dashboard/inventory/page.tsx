@@ -4,7 +4,7 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { PlusCircle, Package, Pencil, Trash2, Download, Upload, AlertTriangle, Edit } from "lucide-react";
+import { PlusCircle, Package, Pencil, Trash2, Download, Upload, AlertTriangle, Edit, Search } from "lucide-react";
 import Link from "next/link";
 import {
   Table,
@@ -28,6 +28,7 @@ import { useToast } from "@/hooks/use-toast";
 import type { Part, ShopSettings } from "@/types";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { Input } from "@/components/ui/input";
 
 const initialParts: Part[] = [
   {
@@ -144,13 +145,14 @@ if (typeof window !== 'undefined') {
 
 export default function InventoryPage() {
   const { toast } = useToast();
-  const [parts, setParts] = useState<Part[]>([]);
+  const [allParts, setAllParts] = useState<Part[]>([]);
+  const [searchTerm, setSearchTerm] = useState("");
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [partToDelete, setPartToDelete] = useState<Part | null>(null);
   const [isMounted, setIsMounted] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [shopSettings, setShopSettings] = useState<ShopSettings | null>(null);
-  const shopSettingsRef = useRef<ShopSettings | null>(null); // For interval comparison
+  const shopSettingsRef = useRef<ShopSettings | null>(null);
 
   const currency = useMemo(() => shopSettings?.currencySymbol || '₱', [shopSettings]);
 
@@ -158,19 +160,19 @@ export default function InventoryPage() {
     setIsMounted(true);
     if (typeof window !== 'undefined') {
       if ((window as any).__inventoryStore) {
-        setParts([...(window as any).__inventoryStore.parts]);
+        setAllParts([...(window as any).__inventoryStore.parts]);
       }
       if ((window as any).__settingsStore) {
         const currentSettings = (window as any).__settingsStore.getSettings();
         setShopSettings(currentSettings);
-        shopSettingsRef.current = currentSettings; // Initialize ref
+        shopSettingsRef.current = currentSettings;
       }
     }
   }, []);
 
   const refreshParts = () => {
     if (typeof window !== 'undefined' && (window as any).__inventoryStore) {
-      setParts([...(window as any).__inventoryStore.parts]);
+      setAllParts([...(window as any).__inventoryStore.parts]);
     }
   };
 
@@ -179,14 +181,12 @@ export default function InventoryPage() {
 
     const interval = setInterval(() => {
       if (typeof window !== 'undefined') {
-        // Refresh parts data
         if((window as any).__inventoryStore) {
             const storeParts = (window as any).__inventoryStore.parts;
-            if (JSON.stringify(storeParts) !== JSON.stringify(parts)) {
+            if (JSON.stringify(storeParts) !== JSON.stringify(allParts)) {
             refreshParts();
             }
         }
-        // Refresh shop settings
         if ((window as any).__settingsStore) {
             const newSettings = (window as any).__settingsStore.getSettings();
             if (JSON.stringify(newSettings) !== JSON.stringify(shopSettingsRef.current)) {
@@ -195,9 +195,9 @@ export default function InventoryPage() {
             }
         }
       }
-    }, 1000); // Check every second
+    }, 1000); 
     return () => clearInterval(interval);
-  }, [parts, isMounted]); // Only re-subscribe interval if isMounted changes (or parts for its specific logic)
+  }, [allParts, isMounted]); 
 
   const handleDeletePart = (part: Part) => {
     setPartToDelete(part);
@@ -220,7 +220,7 @@ export default function InventoryPage() {
   };
 
   const handleExportCSV = () => {
-    if (parts.length === 0) {
+    if (filteredParts.length === 0) {
       toast({ title: "No Data", description: "There are no parts to export.", variant: "destructive" });
       return;
     }
@@ -231,7 +231,7 @@ export default function InventoryPage() {
     ];
     const csvRows = [
       headers.join(','),
-      ...parts.map(part => headers.map(header => {
+      ...filteredParts.map(part => headers.map(header => {
         let value = part[header as keyof Part];
         if (value instanceof Date) {
           value = value.toISOString();
@@ -389,6 +389,17 @@ export default function InventoryPage() {
         fileInputRef.current.value = ""; 
     }
   };
+
+  const filteredParts = useMemo(() => {
+    if (!searchTerm) return allParts;
+    const lowercasedFilter = searchTerm.toLowerCase();
+    return allParts.filter(part =>
+      part.name.toLowerCase().includes(lowercasedFilter) ||
+      (part.sku && part.sku.toLowerCase().includes(lowercasedFilter)) ||
+      (part.brand && part.brand.toLowerCase().includes(lowercasedFilter)) ||
+      (part.category && part.category.toLowerCase().includes(lowercasedFilter))
+    );
+  }, [allParts, searchTerm]);
   
   if (!isMounted) {
     return <div className="flex justify-center items-center h-screen"><p>Loading inventory...</p></div>; 
@@ -406,6 +417,16 @@ export default function InventoryPage() {
             <CardDescription>Manage parts, stock levels, and suppliers.</CardDescription>
           </div>
           <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
+            <div className="relative w-full md:w-auto flex-grow md:flex-grow-0">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                type="search"
+                placeholder="Search parts..."
+                className="pl-8 w-full"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
             <Button asChild variant="outline" className="w-full sm:w-auto">
                 <Link href="/dashboard/inventory/adjust-stock">
                     <Edit className="mr-2 h-4 w-4" /> Adjust Stock
@@ -432,7 +453,7 @@ export default function InventoryPage() {
           </div>
         </CardHeader>
         <CardContent>
-          {parts.length > 0 ? (
+          {filteredParts.length > 0 ? (
             <Table>
               <TableHeader>
                 <TableRow>
@@ -447,7 +468,7 @@ export default function InventoryPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {parts.map((part) => {
+                {filteredParts.map((part) => {
                   const isLowStock = part.isActive && part.minStockAlert !== undefined && part.stockQuantity <= part.minStockAlert && part.stockQuantity > 0;
                   const isOutOfStock = part.isActive && part.stockQuantity === 0;
                   return (
@@ -494,8 +515,8 @@ export default function InventoryPage() {
           ) : (
             <div className="flex flex-col items-center justify-center gap-4 py-10 text-muted-foreground">
                 <Package className="h-16 w-16" />
-                <p className="text-lg">No parts found in inventory.</p>
-                <p>Get started by adding a new part or importing from CSV.</p>
+                <p className="text-lg">{searchTerm ? "No parts match your search." : "No parts found in inventory."}</p>
+                {!searchTerm && <p>Get started by adding a new part or importing from CSV.</p>}
             </div>
           )}
         </CardContent>
@@ -520,4 +541,3 @@ export default function InventoryPage() {
     </div>
   );
 }
-

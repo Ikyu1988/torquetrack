@@ -4,7 +4,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { PlusCircle, Receipt, Pencil, Trash2, Eye } from "lucide-react";
+import { PlusCircle, Receipt, Pencil, Trash2, Eye, Search } from "lucide-react";
 import Link from "next/link";
 import {
   Table,
@@ -28,7 +28,10 @@ import { useToast } from "@/hooks/use-toast";
 import type { PurchaseOrder, Supplier, ShopSettings } from "@/types";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
-import { PURCHASE_ORDER_STATUSES } from "@/lib/constants";
+import { PURCHASE_ORDER_STATUSES, PURCHASE_ORDER_STATUS_OPTIONS } from "@/lib/constants";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
 
 const initialPurchaseOrders: PurchaseOrder[] = [
   {
@@ -55,8 +58,7 @@ if (typeof window !== 'undefined') {
       purchaseOrders: [...initialPurchaseOrders],
       addPurchaseOrder: (poData: Omit<PurchaseOrder, 'id' | 'createdAt' | 'updatedAt' | 'subTotal' | 'grandTotal' >) => {
         const subTotal = poData.items.reduce((sum, item) => sum + item.totalPrice, 0);
-        // Simple tax calculation for now, could be based on supplier or shop settings
-        const taxAmount = poData.taxAmount !== undefined ? poData.taxAmount : (subTotal * 0.10); // Example 10% tax
+        const taxAmount = poData.taxAmount !== undefined ? poData.taxAmount : (subTotal * 0.10); 
         const grandTotal = subTotal + taxAmount + (poData.shippingCost || 0);
 
         const newPurchaseOrder: PurchaseOrder = {
@@ -69,7 +71,6 @@ if (typeof window !== 'undefined') {
           updatedAt: new Date(),
         };
         (window as any).__purchaseOrderStore.purchaseOrders.push(newPurchaseOrder);
-        // Mark requisition as ordered if applicable
         if (newPurchaseOrder.purchaseRequisitionId && (window as any).__purchaseRequisitionStore) {
             const req = (window as any).__purchaseRequisitionStore.getRequisitionById(newPurchaseOrder.purchaseRequisitionId);
             if (req) {
@@ -110,7 +111,9 @@ if (typeof window !== 'undefined') {
 
 export default function PurchaseOrdersPage() {
   const { toast } = useToast();
-  const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([]);
+  const [allPurchaseOrders, setAllPurchaseOrders] = useState<PurchaseOrder[]>([]);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState<PurchaseOrderStatus | "ALL">("ALL");
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [shopSettings, setShopSettings] = useState<ShopSettings | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -129,7 +132,7 @@ export default function PurchaseOrdersPage() {
     setIsMounted(true);
     if (typeof window !== 'undefined') {
       if ((window as any).__purchaseOrderStore) {
-        setPurchaseOrders([...(window as any).__purchaseOrderStore.purchaseOrders]);
+        setAllPurchaseOrders([...(window as any).__purchaseOrderStore.purchaseOrders]);
       }
       if ((window as any).__supplierStore) {
         setSuppliers([...(window as any).__supplierStore.suppliers]);
@@ -142,7 +145,7 @@ export default function PurchaseOrdersPage() {
 
   const refreshPurchaseOrders = () => {
     if (typeof window !== 'undefined' && (window as any).__purchaseOrderStore) {
-      setPurchaseOrders([...(window as any).__purchaseOrderStore.purchaseOrders]);
+      setAllPurchaseOrders([...(window as any).__purchaseOrderStore.purchaseOrders]);
     }
   };
 
@@ -151,13 +154,13 @@ export default function PurchaseOrdersPage() {
     const interval = setInterval(() => {
       if (typeof window !== 'undefined' && (window as any).__purchaseOrderStore) {
         const storePOs = (window as any).__purchaseOrderStore.purchaseOrders;
-        if (JSON.stringify(storePOs) !== JSON.stringify(purchaseOrders)) {
+        if (JSON.stringify(storePOs) !== JSON.stringify(allPurchaseOrders)) {
           refreshPurchaseOrders();
         }
       }
     }, 1000);
     return () => clearInterval(interval);
-  }, [purchaseOrders, isMounted]);
+  }, [allPurchaseOrders, isMounted]);
 
   const handleDeletePurchaseOrder = (po: PurchaseOrder) => {
     if (po.status === PURCHASE_ORDER_STATUSES.FULLY_RECEIVED || po.status === PURCHASE_ORDER_STATUSES.PARTIALLY_RECEIVED) {
@@ -183,6 +186,21 @@ export default function PurchaseOrdersPage() {
     setPoToDelete(null);
   };
   
+  const filteredPurchaseOrders = useMemo(() => {
+    let filtered = allPurchaseOrders;
+    if (statusFilter !== "ALL") {
+      filtered = filtered.filter(po => po.status === statusFilter);
+    }
+    if (searchTerm) {
+      const lowerSearchTerm = searchTerm.toLowerCase();
+      filtered = filtered.filter(po =>
+        po.id.toLowerCase().includes(lowerSearchTerm) ||
+        (supplierMap.get(po.supplierId)?.toLowerCase() || "").includes(lowerSearchTerm)
+      );
+    }
+    return filtered;
+  }, [allPurchaseOrders, searchTerm, statusFilter, supplierMap]);
+
   if (!isMounted) {
     return <div className="flex justify-center items-center h-screen"><p>Loading purchase orders...</p></div>;
   }
@@ -190,7 +208,7 @@ export default function PurchaseOrdersPage() {
   return (
     <div className="flex flex-col gap-6">
       <Card className="shadow-lg">
-        <CardHeader className="flex flex-row items-center justify-between">
+        <CardHeader className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-3">
               <Receipt className="h-6 w-6 text-primary" />
@@ -198,14 +216,35 @@ export default function PurchaseOrdersPage() {
             </div>
             <CardDescription>Manage orders placed with your suppliers.</CardDescription>
           </div>
-          <Button asChild>
-            <Link href="/dashboard/purchase-orders/new">
-              <PlusCircle className="mr-2 h-4 w-4" /> Create New PO
-            </Link>
-          </Button>
+          <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
+             <div className="relative w-full sm:w-auto md:w-48">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                type="search"
+                placeholder="Search PO ID, Supplier..."
+                className="pl-8 w-full"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+            <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as PurchaseOrderStatus | "ALL")}>
+              <SelectTrigger className="w-full sm:w-auto md:w-[180px]">
+                <SelectValue placeholder="Filter by status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">All Statuses</SelectItem>
+                {PURCHASE_ORDER_STATUS_OPTIONS.map(status => <SelectItem key={status} value={status}>{status}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <Button asChild className="w-full sm:w-auto">
+              <Link href="/dashboard/purchase-orders/new">
+                <PlusCircle className="mr-2 h-4 w-4" /> Create New PO
+              </Link>
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
-          {purchaseOrders.length > 0 ? (
+          {filteredPurchaseOrders.length > 0 ? (
             <Table>
               <TableHeader>
                 <TableRow>
@@ -219,7 +258,7 @@ export default function PurchaseOrdersPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {purchaseOrders.map((po) => (
+                {filteredPurchaseOrders.map((po) => (
                   <TableRow key={po.id}>
                     <TableCell className="font-medium">{`#${po.id.substring(0,6)}`}</TableCell>
                     <TableCell>{supplierMap.get(po.supplierId) || "N/A"}</TableCell>
@@ -259,8 +298,8 @@ export default function PurchaseOrdersPage() {
           ) : (
             <div className="flex flex-col items-center justify-center gap-4 py-10 text-muted-foreground">
                 <Receipt className="h-16 w-16" />
-                <p className="text-lg">No purchase orders found.</p>
-                <p>Get started by creating a new purchase order.</p>
+                <p className="text-lg">{searchTerm || statusFilter !== "ALL" ? "No POs match your criteria." : "No purchase orders found."}</p>
+                 {!(searchTerm || statusFilter !== "ALL") && <p>Get started by creating a new purchase order.</p>}
             </div>
           )}
         </CardContent>

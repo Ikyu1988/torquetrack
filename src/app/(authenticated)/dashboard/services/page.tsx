@@ -4,7 +4,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { PlusCircle, Wrench, Pencil, Trash2 } from "lucide-react";
+import { PlusCircle, Wrench, Pencil, Trash2, Search } from "lucide-react";
 import Link from "next/link";
 import {
   Table,
@@ -28,17 +28,18 @@ import { useToast } from "@/hooks/use-toast";
 import type { Service, ShopSettings } from "@/types";
 import { Badge } from "@/components/ui/badge";
 import { COMMISSION_TYPES } from "@/lib/constants";
+import { Input } from "@/components/ui/input";
 
 const initialServices: Service[] = [
   {
     id: "svc1",
     name: "Oil Change",
     category: "Maintenance",
-    defaultLaborCost: 2500, // Example in Pesos
+    defaultLaborCost: 2500, 
     estimatedHours: 1,
     isActive: true,
     commissionType: COMMISSION_TYPES.FIXED,
-    commissionValue: 250, // Example in Pesos
+    commissionValue: 250, 
     createdAt: new Date(),
     updatedAt: new Date(),
   },
@@ -46,7 +47,7 @@ const initialServices: Service[] = [
     id: "svc2",
     name: "Tire Replacement",
     category: "Wheels",
-    defaultLaborCost: 3750, // Example in Pesos
+    defaultLaborCost: 3750, 
     estimatedHours: 1.5,
     isActive: true,
     commissionType: COMMISSION_TYPES.PERCENTAGE,
@@ -58,7 +59,7 @@ const initialServices: Service[] = [
     id: "svc3",
     name: "Engine Tune-up",
     category: "Engine",
-    defaultLaborCost: 7500, // Example in Pesos
+    defaultLaborCost: 7500, 
     estimatedHours: 3,
     isActive: false,
     createdAt: new Date(),
@@ -101,7 +102,8 @@ if (typeof window !== 'undefined') {
 
 export default function ServicesPage() {
   const { toast } = useToast();
-  const [services, setServices] = useState<Service[]>([]);
+  const [allServices, setAllServices] = useState<Service[]>([]);
+  const [searchTerm, setSearchTerm] = useState("");
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [serviceToDelete, setServiceToDelete] = useState<Service | null>(null);
   const [isMounted, setIsMounted] = useState(false);
@@ -113,7 +115,7 @@ export default function ServicesPage() {
     setIsMounted(true);
     if (typeof window !== 'undefined') {
       if ((window as any).__serviceStore) {
-        setServices([...(window as any).__serviceStore.services]);
+        setAllServices([...(window as any).__serviceStore.services]);
       }
       if ((window as any).__settingsStore) {
         setShopSettings((window as any).__settingsStore.getSettings());
@@ -123,7 +125,7 @@ export default function ServicesPage() {
 
   const refreshServices = () => {
     if (typeof window !== 'undefined' && (window as any).__serviceStore) {
-      setServices([...(window as any).__serviceStore.services]);
+      setAllServices([...(window as any).__serviceStore.services]);
     }
   };
 
@@ -133,13 +135,13 @@ export default function ServicesPage() {
     const interval = setInterval(() => {
       if (typeof window !== 'undefined' && (window as any).__serviceStore) {
         const storeServices = (window as any).__serviceStore.services;
-        if (JSON.stringify(storeServices) !== JSON.stringify(services)) {
+        if (JSON.stringify(storeServices) !== JSON.stringify(allServices)) {
           refreshServices();
         }
       }
     }, 1000);
     return () => clearInterval(interval);
-  }, [services, isMounted]);
+  }, [allServices, isMounted]);
 
   const handleDeleteService = (service: Service) => {
     setServiceToDelete(service);
@@ -161,6 +163,15 @@ export default function ServicesPage() {
     setServiceToDelete(null);
   };
   
+  const filteredServices = useMemo(() => {
+    if (!searchTerm) return allServices;
+    const lowercasedFilter = searchTerm.toLowerCase();
+    return allServices.filter(service =>
+      service.name.toLowerCase().includes(lowercasedFilter) ||
+      (service.category && service.category.toLowerCase().includes(lowercasedFilter))
+    );
+  }, [allServices, searchTerm]);
+
   if (!isMounted) {
     return <div className="flex justify-center items-center h-screen"><p>Loading services...</p></div>; 
   }
@@ -168,7 +179,7 @@ export default function ServicesPage() {
   return (
     <div className="flex flex-col gap-6">
       <Card className="shadow-lg">
-        <CardHeader className="flex flex-row items-center justify-between">
+        <CardHeader className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-3">
               <Wrench className="h-6 w-6 text-primary" />
@@ -176,14 +187,26 @@ export default function ServicesPage() {
             </div>
             <CardDescription>Manage the services offered by your workshop.</CardDescription>
           </div>
-           <Button asChild>
-            <Link href="/dashboard/services/new">
-              <PlusCircle className="mr-2 h-4 w-4" /> Add New Service
-            </Link>
-          </Button>
+          <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
+            <div className="relative w-full md:w-64">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                type="search"
+                placeholder="Search services..."
+                className="pl-8 w-full"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+            <Button asChild className="w-full sm:w-auto">
+              <Link href="/dashboard/services/new">
+                <PlusCircle className="mr-2 h-4 w-4" /> Add New Service
+              </Link>
+            </Button>
+           </div>
         </CardHeader>
         <CardContent>
-          {services.length > 0 ? (
+          {filteredServices.length > 0 ? (
             <Table>
               <TableHeader>
                 <TableRow>
@@ -196,7 +219,7 @@ export default function ServicesPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {services.map((service) => (
+                {filteredServices.map((service) => (
                   <TableRow key={service.id}>
                     <TableCell className="font-medium">{service.name}</TableCell>
                     <TableCell>{service.category || "-"}</TableCell>
@@ -235,8 +258,8 @@ export default function ServicesPage() {
           ) : (
             <div className="flex flex-col items-center justify-center gap-4 py-10 text-muted-foreground">
                 <Wrench className="h-16 w-16" />
-                <p className="text-lg">No services found.</p>
-                <p>Get started by adding a new service.</p>
+                <p className="text-lg">{searchTerm ? "No services match your search." : "No services found."}</p>
+                {!searchTerm && <p>Get started by adding a new service.</p>}
             </div>
           )}
         </CardContent>

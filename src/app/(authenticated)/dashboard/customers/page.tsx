@@ -1,10 +1,10 @@
 
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { PlusCircle, Users, Pencil, Trash2 } from "lucide-react";
+import { PlusCircle, Users, Pencil, Trash2, Search } from "lucide-react";
 import Link from "next/link";
 import {
   Table,
@@ -23,10 +23,10 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import type { Customer } from "@/types";
+import { Input } from "@/components/ui/input";
 
 const initialCustomers: Customer[] = [
   {
@@ -59,8 +59,6 @@ const initialCustomers: Customer[] = [
   },
 ];
 
-// This would typically come from a global state/context or be managed by a library like React Query
-// For simulation, we'll use a simple in-memory store that can be "updated" by other pages.
 if (typeof window !== 'undefined') {
   if (!(window as any).__customerStore) {
     (window as any).__customerStore = {
@@ -97,7 +95,8 @@ if (typeof window !== 'undefined') {
 
 export default function CustomersPage() {
   const { toast } = useToast();
-  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [allCustomers, setAllCustomers] = useState<Customer[]>([]);
+  const [searchTerm, setSearchTerm] = useState("");
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [customerToDelete, setCustomerToDelete] = useState<Customer | null>(null);
   const [isMounted, setIsMounted] = useState(false);
@@ -105,31 +104,30 @@ export default function CustomersPage() {
   useEffect(() => {
     setIsMounted(true);
     if (typeof window !== 'undefined' && (window as any).__customerStore) {
-      setCustomers([...(window as any).__customerStore.customers]);
+      setAllCustomers([...(window as any).__customerStore.customers]);
     }
   }, []);
 
-  // Function to refresh customers from the pseudo-store
   const refreshCustomers = () => {
     if (typeof window !== 'undefined' && (window as any).__customerStore) {
-      setCustomers([...(window as any).__customerStore.customers]);
+      setAllCustomers([...(window as any).__customerStore.customers]);
     }
   };
 
-  // Periodically check for updates from the pseudo-store (e.g., after adding/editing)
   useEffect(() => {
-    if (!isMounted) return; // Ensure this runs only after mount
+    if (!isMounted) return; 
 
     const interval = setInterval(() => {
       if (typeof window !== 'undefined' && (window as any).__customerStore) {
         const storeCustomers = (window as any).__customerStore.customers;
-        if (JSON.stringify(storeCustomers) !== JSON.stringify(customers)) {
+        // Simple comparison, could be more robust for deep object changes if necessary
+        if (JSON.stringify(storeCustomers) !== JSON.stringify(allCustomers)) {
           refreshCustomers();
         }
       }
-    }, 1000); // Check every second
+    }, 1000); 
     return () => clearInterval(interval);
-  }, [customers, isMounted]); // Added isMounted to dependencies
+  }, [allCustomers, isMounted]);
 
 
   const handleDeleteCustomer = (customer: Customer) => {
@@ -152,8 +150,18 @@ export default function CustomersPage() {
     setCustomerToDelete(null);
   };
   
+  const filteredCustomers = useMemo(() => {
+    if (!searchTerm) return allCustomers;
+    const lowercasedFilter = searchTerm.toLowerCase();
+    return allCustomers.filter(customer =>
+      customer.firstName.toLowerCase().includes(lowercasedFilter) ||
+      customer.lastName.toLowerCase().includes(lowercasedFilter) ||
+      (customer.email && customer.email.toLowerCase().includes(lowercasedFilter)) ||
+      customer.phone.toLowerCase().includes(lowercasedFilter)
+    );
+  }, [allCustomers, searchTerm]);
+
   if (!isMounted) {
-    // Or a loading skeleton
     return <div className="flex justify-center items-center h-screen"><p>Loading customers...</p></div>; 
   }
 
@@ -161,7 +169,7 @@ export default function CustomersPage() {
   return (
     <div className="flex flex-col gap-6">
       <Card className="shadow-lg">
-        <CardHeader className="flex flex-row items-center justify-between">
+        <CardHeader className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-3">
               <Users className="h-6 w-6 text-primary" />
@@ -169,14 +177,26 @@ export default function CustomersPage() {
             </div>
             <CardDescription>Manage your customer database.</CardDescription>
           </div>
-          <Button asChild>
-            <Link href="/dashboard/customers/new">
-              <PlusCircle className="mr-2 h-4 w-4" /> Add New Customer
-            </Link>
-          </Button>
+          <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
+            <div className="relative w-full md:w-64">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                type="search"
+                placeholder="Search customers..."
+                className="pl-8 w-full"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+            <Button asChild className="w-full sm:w-auto">
+              <Link href="/dashboard/customers/new">
+                <PlusCircle className="mr-2 h-4 w-4" /> Add New Customer
+              </Link>
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
-          {customers.length > 0 ? (
+          {filteredCustomers.length > 0 ? (
             <Table>
               <TableHeader>
                 <TableRow>
@@ -187,7 +207,7 @@ export default function CustomersPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {customers.map((customer) => (
+                {filteredCustomers.map((customer) => (
                   <TableRow key={customer.id}>
                     <TableCell className="font-medium">{`${customer.firstName} ${customer.lastName}`}</TableCell>
                     <TableCell>{customer.email || "-"}</TableCell>
@@ -216,8 +236,8 @@ export default function CustomersPage() {
           ) : (
             <div className="flex flex-col items-center justify-center gap-4 py-10 text-muted-foreground">
                 <Users className="h-16 w-16" />
-                <p className="text-lg">No customers found.</p>
-                <p>Get started by adding a new customer.</p>
+                <p className="text-lg">{searchTerm ? "No customers match your search." : "No customers found."}</p>
+                {!searchTerm && <p>Get started by adding a new customer.</p>}
             </div>
           )}
         </CardContent>
@@ -243,4 +263,3 @@ export default function CustomersPage() {
     </div>
   );
 }
-

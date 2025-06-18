@@ -1,10 +1,10 @@
 
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { PlusCircle, Truck, Pencil, Trash2 } from "lucide-react";
+import { PlusCircle, Truck, Pencil, Trash2, Search } from "lucide-react";
 import Link from "next/link";
 import {
   Table,
@@ -27,6 +27,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import type { Supplier } from "@/types";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 
 const initialSuppliers: Supplier[] = [
   {
@@ -88,7 +89,8 @@ if (typeof window !== 'undefined') {
 
 export default function SuppliersPage() {
   const { toast } = useToast();
-  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [allSuppliers, setAllSuppliers] = useState<Supplier[]>([]);
+  const [searchTerm, setSearchTerm] = useState("");
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [supplierToDelete, setSupplierToDelete] = useState<Supplier | null>(null);
   const [isMounted, setIsMounted] = useState(false);
@@ -96,13 +98,13 @@ export default function SuppliersPage() {
   useEffect(() => {
     setIsMounted(true);
     if (typeof window !== 'undefined' && (window as any).__supplierStore) {
-      setSuppliers([...(window as any).__supplierStore.suppliers]);
+      setAllSuppliers([...(window as any).__supplierStore.suppliers]);
     }
   }, []);
 
   const refreshSuppliers = () => {
     if (typeof window !== 'undefined' && (window as any).__supplierStore) {
-      setSuppliers([...(window as any).__supplierStore.suppliers]);
+      setAllSuppliers([...(window as any).__supplierStore.suppliers]);
     }
   };
 
@@ -111,13 +113,13 @@ export default function SuppliersPage() {
     const interval = setInterval(() => {
       if (typeof window !== 'undefined' && (window as any).__supplierStore) {
         const storeSuppliers = (window as any).__supplierStore.suppliers;
-        if (JSON.stringify(storeSuppliers) !== JSON.stringify(suppliers)) {
+        if (JSON.stringify(storeSuppliers) !== JSON.stringify(allSuppliers)) {
           refreshSuppliers();
         }
       }
     }, 1000);
     return () => clearInterval(interval);
-  }, [suppliers, isMounted]);
+  }, [allSuppliers, isMounted]);
 
   const handleDeleteSupplier = (supplier: Supplier) => {
     setSupplierToDelete(supplier);
@@ -126,7 +128,6 @@ export default function SuppliersPage() {
 
   const confirmDelete = () => {
     if (supplierToDelete) {
-      // Future: Check if supplier is tied to existing Purchase Orders
       if (typeof window !== 'undefined' && (window as any).__supplierStore) {
         (window as any).__supplierStore.deleteSupplier(supplierToDelete.id);
         refreshSuppliers();
@@ -140,6 +141,17 @@ export default function SuppliersPage() {
     setSupplierToDelete(null);
   };
   
+  const filteredSuppliers = useMemo(() => {
+    if (!searchTerm) return allSuppliers;
+    const lowercasedFilter = searchTerm.toLowerCase();
+    return allSuppliers.filter(supplier =>
+      supplier.name.toLowerCase().includes(lowercasedFilter) ||
+      (supplier.contactPerson && supplier.contactPerson.toLowerCase().includes(lowercasedFilter)) ||
+      (supplier.email && supplier.email.toLowerCase().includes(lowercasedFilter)) ||
+      (supplier.phone && supplier.phone.toLowerCase().includes(lowercasedFilter))
+    );
+  }, [allSuppliers, searchTerm]);
+
   if (!isMounted) {
     return <div className="flex justify-center items-center h-screen"><p>Loading suppliers...</p></div>; 
   }
@@ -147,7 +159,7 @@ export default function SuppliersPage() {
   return (
     <div className="flex flex-col gap-6">
       <Card className="shadow-lg">
-        <CardHeader className="flex flex-row items-center justify-between">
+        <CardHeader className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-3">
               <Truck className="h-6 w-6 text-primary" />
@@ -155,14 +167,26 @@ export default function SuppliersPage() {
             </div>
             <CardDescription>Manage your parts and service suppliers.</CardDescription>
           </div>
-          <Button asChild>
-            <Link href="/dashboard/suppliers/new">
-              <PlusCircle className="mr-2 h-4 w-4" /> Add New Supplier
-            </Link>
-          </Button>
+          <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
+            <div className="relative w-full md:w-64">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                type="search"
+                placeholder="Search suppliers..."
+                className="pl-8 w-full"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+            <Button asChild className="w-full sm:w-auto">
+              <Link href="/dashboard/suppliers/new">
+                <PlusCircle className="mr-2 h-4 w-4" /> Add New Supplier
+              </Link>
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
-          {suppliers.length > 0 ? (
+          {filteredSuppliers.length > 0 ? (
             <Table>
               <TableHeader>
                 <TableRow>
@@ -175,7 +199,7 @@ export default function SuppliersPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {suppliers.map((supplier) => (
+                {filteredSuppliers.map((supplier) => (
                   <TableRow key={supplier.id}>
                     <TableCell className="font-medium">{supplier.name}</TableCell>
                     <TableCell>{supplier.contactPerson || "-"}</TableCell>
@@ -210,8 +234,8 @@ export default function SuppliersPage() {
           ) : (
             <div className="flex flex-col items-center justify-center gap-4 py-10 text-muted-foreground">
                 <Truck className="h-16 w-16" />
-                <p className="text-lg">No suppliers found.</p>
-                <p>Get started by adding a new supplier.</p>
+                <p className="text-lg">{searchTerm ? "No suppliers match your search." : "No suppliers found."}</p>
+                {!searchTerm && <p>Get started by adding a new supplier.</p>}
             </div>
           )}
         </CardContent>

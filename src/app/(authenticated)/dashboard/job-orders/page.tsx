@@ -4,7 +4,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { PlusCircle, ClipboardList, Pencil, Trash2, Eye } from "lucide-react";
+import { PlusCircle, ClipboardList, Pencil, Trash2, Eye, Search } from "lucide-react";
 import Link from "next/link";
 import {
   Table,
@@ -28,13 +28,16 @@ import { useToast } from "@/hooks/use-toast";
 import type { JobOrder, Customer, Motorcycle, Part, Service, Payment, PaymentMethod, ShopSettings } from "@/types";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
-import { PAYMENT_STATUSES, JOB_ORDER_STATUSES } from "@/lib/constants";
+import { PAYMENT_STATUSES, JOB_ORDER_STATUSES, JOB_ORDER_STATUS_OPTIONS } from "@/lib/constants";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const today = new Date();
 const yesterday = new Date(today);
 yesterday.setDate(today.getDate() - 1);
 const fiveDaysAgo = new Date(today);
 fiveDaysAgo.setDate(today.getDate() - 5);
+
 
 const initialJobOrders: JobOrder[] = [
   {
@@ -55,10 +58,10 @@ const initialJobOrders: JobOrder[] = [
     paymentStatus: PAYMENT_STATUSES.UNPAID,
     amountPaid: 0,
     paymentHistory: [],
-    createdAt: fiveDaysAgo, // Updated to be recent
-    updatedAt: fiveDaysAgo, // Updated
+    createdAt: new Date(new Date().setDate(new Date().getDate() - 2)), // Make it 2 days ago
+    updatedAt: new Date(new Date().setDate(new Date().getDate() - 2)),
     createdByUserId: "user123",
-    estimatedCompletionDate: new Date(new Date().setDate(new Date().getDate() + 2)), // 2 days from now
+    estimatedCompletionDate: new Date(new Date().setDate(new Date().getDate() + 1)), // 1 day from now
   },
   {
     id: "jo2",
@@ -78,19 +81,19 @@ const initialJobOrders: JobOrder[] = [
     paymentStatus: PAYMENT_STATUSES.PAID,
     amountPaid: 537.50,
     paymentHistory: [
-        { id: "pay1", jobOrderId: "jo2", amount: 537.50, paymentDate: yesterday, method: "Credit Card", processedByUserId: "user456", createdAt: yesterday, notes: "Paid in full via CC" } // Updated paymentDate
+        { id: "pay1", jobOrderId: "jo2", amount: 537.50, paymentDate: new Date(new Date().setDate(new Date().getDate() -1)), method: "Credit Card", processedByUserId: "user456", createdAt: new Date(new Date().setDate(new Date().getDate() -1)), notes: "Paid in full via CC" } 
     ],
-    createdAt: yesterday, // Updated to be recent
-    updatedAt: yesterday, // Updated
+    createdAt: new Date(new Date().setDate(new Date().getDate() - 1)), // Make it yesterday
+    updatedAt: new Date(new Date().setDate(new Date().getDate() - 1)),
     createdByUserId: "user456",
-    actualCompletionDate: yesterday, // Updated
+    actualCompletionDate: new Date(new Date().setDate(new Date().getDate() - 1)), 
   },
 ];
 
 type AddJobOrderInput = Omit<JobOrder, 'id' | 'createdAt' | 'updatedAt' | 'createdByUserId' | 'grandTotal' | 'amountPaid' | 'paymentHistory' | 'taxAmount'> & {
   initialPaymentMethod?: PaymentMethod;
   initialPaymentNotes?: string;
-  taxAmount?: number; // Keep this optional for direct sales if pre-calculated
+  taxAmount?: number; 
 };
 
 
@@ -108,7 +111,6 @@ if (typeof window !== 'undefined') {
             taxRateValue = (window as any).__settingsStore.getSettings()?.defaultTaxRate || 0;
         }
         const subTotalBeforeTax = totalLabor + totalParts - discount;
-        // Always calculate tax unless it's explicitly provided (e.g. for direct sales where it might be calculated on client)
         const calculatedTaxAmount = jobOrderData.taxAmount !== undefined ? Number(jobOrderData.taxAmount) : (subTotalBeforeTax * (taxRateValue / 100));
 
 
@@ -161,7 +163,7 @@ if (typeof window !== 'undefined') {
       updateJobOrder: (updatedJobOrder: JobOrder) => {
         const index = (window as any).__jobOrderStore.jobOrders.findIndex((jo: JobOrder) => jo.id === updatedJobOrder.id);
         if (index !== -1) {
-          const oldJobOrder = { ...(window as any).__jobOrderStore.jobOrders[index] }; // Deep copy partsUsed for accurate stock reversal
+          const oldJobOrder = { ...(window as any).__jobOrderStore.jobOrders[index] }; 
           oldJobOrder.partsUsed = oldJobOrder.partsUsed.map(p => ({...p}));
 
           const totalLabor = updatedJobOrder.servicesPerformed.reduce((sum, s) => sum + s.laborCost, 0);
@@ -183,7 +185,6 @@ if (typeof window !== 'undefined') {
             };
           
           if ((window as any).__inventoryStore) {
-            // Return old parts to stock
             oldJobOrder.partsUsed.forEach(oldItem => {
               const partIndex = (window as any).__inventoryStore.parts.findIndex((p: Part) => p.id === oldItem.partId);
               if (partIndex !== -1) {
@@ -191,7 +192,6 @@ if (typeof window !== 'undefined') {
               }
             });
 
-            // Deduct new parts from stock
             updatedJobOrder.partsUsed.forEach(newItem => {
                 const partIndex = (window as any).__inventoryStore.parts.findIndex((p: Part) => p.id === newItem.partId);
                 if(partIndex !== -1) {
@@ -210,7 +210,6 @@ if (typeof window !== 'undefined') {
          const jobOrderIndex = (window as any).__jobOrderStore.jobOrders.findIndex((jo: JobOrder) => jo.id === jobOrderId);
         if (jobOrderIndex !== -1) {
             const jobOrderToDelete = (window as any).__jobOrderStore.jobOrders[jobOrderIndex];
-            // Return parts to inventory
             if ((window as any).__inventoryStore && jobOrderToDelete.partsUsed) {
                 jobOrderToDelete.partsUsed.forEach(item => {
                     const partIndex = (window as any).__inventoryStore.parts.findIndex((p: Part) => p.id === item.partId);
@@ -219,9 +218,7 @@ if (typeof window !== 'undefined') {
                     }
                 });
             }
-            // Delete the job order
             (window as any).__jobOrderStore.jobOrders = (window as any).__jobOrderStore.jobOrders.filter((jo: JobOrder) => jo.id !== jobOrderId);
-            // Delete associated payments
             if ((window as any).__paymentStore && jobOrderToDelete.paymentHistory) {
                 jobOrderToDelete.paymentHistory.forEach(p => (window as any).__paymentStore.deletePaymentById?.(p.id));
             }
@@ -236,7 +233,7 @@ if (typeof window !== 'undefined') {
             jobOrder.paymentHistory = payments;
             jobOrder.amountPaid = payments.reduce((sum: number, p: Payment) => sum + p.amount, 0);
             if (jobOrder.amountPaid >= jobOrder.grandTotal && jobOrder.grandTotal > 0.001) jobOrder.paymentStatus = PAYMENT_STATUSES.PAID;
-            else if (jobOrder.grandTotal <= 0.001 && jobOrder.amountPaid <= 0.001) jobOrder.paymentStatus = PAYMENT_STATUSES.PAID; // Zero total orders are Paid
+            else if (jobOrder.grandTotal <= 0.001 && jobOrder.amountPaid <= 0.001) jobOrder.paymentStatus = PAYMENT_STATUSES.PAID; 
             else if (jobOrder.amountPaid > 0) jobOrder.paymentStatus = PAYMENT_STATUSES.PARTIAL;
             else jobOrder.paymentStatus = PAYMENT_STATUSES.UNPAID;
         }
@@ -250,16 +247,13 @@ if (typeof window !== 'undefined') {
             jobOrder.paymentHistory.push(payment);
             jobOrder.amountPaid += payment.amount;
           } else {
-            // This case might happen if a payment is added externally and then again through this function
-            // Recalculate amountPaid to be safe
             jobOrder.amountPaid = jobOrder.paymentHistory.reduce((sum: number, p: Payment) => sum + p.amount, 0);
           }
           
           const grandTotalNum = Number(jobOrder.grandTotal) || 0;
-          // Check for floating point precision issues with a small epsilon
           if (jobOrder.amountPaid >= grandTotalNum - 0.001 && grandTotalNum > 0.001) {
             jobOrder.paymentStatus = PAYMENT_STATUSES.PAID;
-          } else if (grandTotalNum <= 0.001 && jobOrder.amountPaid <= 0.001) { // For zero or negative grand total, consider paid
+          } else if (grandTotalNum <= 0.001 && jobOrder.amountPaid <= 0.001) { 
              jobOrder.paymentStatus = PAYMENT_STATUSES.PAID;
           }
            else if (jobOrder.amountPaid > 0) {
@@ -278,7 +272,7 @@ if (typeof window !== 'undefined') {
 
 export default function JobOrdersPage() {
   const { toast } = useToast();
-  const [jobOrders, setJobOrders] = useState<JobOrder[]>([]);
+  const [allJobOrders, setAllJobOrders] = useState<JobOrder[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [motorcycles, setMotorcycles] = useState<Motorcycle[]>([]);
   const [shopSettings, setShopSettings] = useState<ShopSettings | null>(null);
@@ -286,6 +280,8 @@ export default function JobOrdersPage() {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [jobOrderToDelete, setJobOrderToDelete] = useState<JobOrder | null>(null);
   const [isMounted, setIsMounted] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState<JobOrderStatus | "ALL">("ALL");
 
   const currency = useMemo(() => shopSettings?.currencySymbol || '₱', [shopSettings]);
 
@@ -294,12 +290,12 @@ export default function JobOrdersPage() {
     if (typeof window !== 'undefined') {
       if ((window as any).__jobOrderStore) {
         const ordersFromStore = (window as any).__jobOrderStore.jobOrders.map((jo: JobOrder) => {
-            if ((window as any).__paymentStore && (window as any).__jobOrderStore.getJobOrderById) { // ensure getJobOrderById is used
+            if ((window as any).__paymentStore && (window as any).__jobOrderStore.getJobOrderById) { 
                  return (window as any).__jobOrderStore.getJobOrderById(jo.id);
             }
             return jo;
-        }).filter(Boolean); // Filter out any undefined results if getJobOrderById returns undefined
-        setJobOrders([...ordersFromStore]);
+        }).filter(Boolean); 
+        setAllJobOrders([...ordersFromStore]);
       }
       if ((window as any).__customerStore) { 
         setCustomers([...(window as any).__customerStore.customers]);
@@ -320,9 +316,9 @@ export default function JobOrdersPage() {
   }, [customers]);
 
   const motorcycleMap = useMemo(() => {
-    const map = new Map<string, string>();
+    const map = new Map<string, { make: string, model: string, plateNumber: string }>();
     motorcycles.forEach(m => {
-        map.set(m.id, `${m.make} ${m.model} (${m.plateNumber || 'N/A'})`);
+        map.set(m.id, {make: m.make, model: m.model, plateNumber: m.plateNumber});
     });
     return map;
   }, [motorcycles]);
@@ -330,12 +326,12 @@ export default function JobOrdersPage() {
   const refreshJobOrders = () => {
     if (typeof window !== 'undefined' && (window as any).__jobOrderStore) {
        const ordersFromStore = (window as any).__jobOrderStore.jobOrders.map((jo: JobOrder) => {
-            if ((window as any).__paymentStore && (window as any).__jobOrderStore.getJobOrderById) { // ensure getJobOrderById is used
+            if ((window as any).__paymentStore && (window as any).__jobOrderStore.getJobOrderById) { 
                  return (window as any).__jobOrderStore.getJobOrderById(jo.id);
             }
             return jo;
         }).filter(Boolean);
-      setJobOrders([...ordersFromStore]);
+      setAllJobOrders([...ordersFromStore]);
     }
   };
 
@@ -344,7 +340,7 @@ export default function JobOrdersPage() {
     const interval = setInterval(() => {
       if (typeof window !== 'undefined' && (window as any).__jobOrderStore) {
         const storeJobOrdersRaw = (window as any).__jobOrderStore.jobOrders;
-        const currentJOStates = jobOrders.map(jo => ({id: jo.id, updatedAt: jo.updatedAt, amountPaid: jo.amountPaid, paymentStatus: jo.paymentStatus}));
+        const currentJOStates = allJobOrders.map(jo => ({id: jo.id, updatedAt: jo.updatedAt, amountPaid: jo.amountPaid, paymentStatus: jo.paymentStatus}));
         const storeJOStates = storeJobOrdersRaw.map((jo:JobOrder) => {
             const fullJo = (window as any).__jobOrderStore.getJobOrderById(jo.id);
             return {id: fullJo?.id, updatedAt: fullJo?.updatedAt, amountPaid: fullJo?.amountPaid, paymentStatus: fullJo?.paymentStatus};
@@ -356,7 +352,7 @@ export default function JobOrdersPage() {
       }
     }, 1000);
     return () => clearInterval(interval);
-  }, [jobOrders, isMounted]);
+  }, [allJobOrders, isMounted]);
 
   const handleDeleteJobOrder = (jobOrder: JobOrder) => {
     setJobOrderToDelete(jobOrder);
@@ -377,6 +373,27 @@ export default function JobOrdersPage() {
     setShowDeleteDialog(false);
     setJobOrderToDelete(null);
   };
+
+  const filteredJobOrders = useMemo(() => {
+    let filtered = allJobOrders;
+    if (statusFilter !== "ALL") {
+      filtered = filtered.filter(jo => jo.status === statusFilter);
+    }
+    if (searchTerm) {
+      const lowerSearchTerm = searchTerm.toLowerCase();
+      filtered = filtered.filter(jo => {
+        const customerName = jo.customerId ? customerMap.get(jo.customerId)?.toLowerCase() : "";
+        const motorcycleInfo = jo.motorcycleId ? motorcycleMap.get(jo.motorcycleId) : null;
+        const motorcyclePlate = motorcycleInfo?.plateNumber?.toLowerCase() || "";
+        const jobOrderId = jo.id.toLowerCase();
+        
+        return customerName?.includes(lowerSearchTerm) ||
+               motorcyclePlate.includes(lowerSearchTerm) ||
+               jobOrderId.includes(lowerSearchTerm);
+      });
+    }
+    return filtered;
+  }, [allJobOrders, searchTerm, statusFilter, customerMap, motorcycleMap]);
   
   if (!isMounted) {
     return <div className="flex justify-center items-center h-screen"><p>Loading job orders...</p></div>;
@@ -385,7 +402,7 @@ export default function JobOrdersPage() {
   return (
     <div className="flex flex-col gap-6">
       <Card className="shadow-lg">
-        <CardHeader className="flex flex-row items-center justify-between">
+        <CardHeader className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-3">
               <ClipboardList className="h-6 w-6 text-primary" />
@@ -393,14 +410,35 @@ export default function JobOrdersPage() {
             </div>
             <CardDescription>Manage all workshop job orders and direct sales.</CardDescription>
           </div>
-          <Button asChild>
-            <Link href="/dashboard/job-orders/new">
-              <PlusCircle className="mr-2 h-4 w-4" /> Create New Job Order
-            </Link>
-          </Button>
+          <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
+            <div className="relative w-full sm:w-auto md:w-48">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                type="search"
+                placeholder="Search ID, Customer, Plate..."
+                className="pl-8 w-full"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+            <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as JobOrderStatus | "ALL")}>
+              <SelectTrigger className="w-full sm:w-auto md:w-[180px]">
+                <SelectValue placeholder="Filter by status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">All Statuses</SelectItem>
+                {JOB_ORDER_STATUS_OPTIONS.map(status => <SelectItem key={status} value={status}>{status}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <Button asChild className="w-full sm:w-auto">
+              <Link href="/dashboard/job-orders/new">
+                <PlusCircle className="mr-2 h-4 w-4" /> Create New Job Order
+              </Link>
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
-          {jobOrders.length > 0 ? (
+          {filteredJobOrders.length > 0 ? (
             <Table>
               <TableHeader>
                 <TableRow>
@@ -415,11 +453,16 @@ export default function JobOrdersPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {jobOrders.map((jo) => (
+                {filteredJobOrders.map((jo) => (
                   <TableRow key={jo.id}>
                     <TableCell className="font-medium">{`#${jo.id.substring(0,6)}`}</TableCell>
                     <TableCell>{jo.customerId ? customerMap.get(jo.customerId) || "N/A" : "Walk-in Sale"}</TableCell>
-                    <TableCell>{jo.motorcycleId ? motorcycleMap.get(jo.motorcycleId) || "N/A" : (jo.status === JOB_ORDER_STATUSES.SALE_COMPLETED ? "Direct Sale" : "N/A")}</TableCell>
+                    <TableCell>
+                        {jo.motorcycleId 
+                            ? `${motorcycleMap.get(jo.motorcycleId)?.make} ${motorcycleMap.get(jo.motorcycleId)?.model} (${motorcycleMap.get(jo.motorcycleId)?.plateNumber || 'N/A'})`
+                            : (jo.status === JOB_ORDER_STATUSES.SALE_COMPLETED ? "Direct Sale" : "N/A")
+                        }
+                    </TableCell>
                     <TableCell><Badge variant={jo.status === JOB_ORDER_STATUSES.COMPLETED || jo.status === JOB_ORDER_STATUSES.SALE_COMPLETED ? "default" : "secondary"}>{jo.status}</Badge></TableCell>
                     <TableCell><Badge variant={jo.paymentStatus === PAYMENT_STATUSES.PAID ? "default" : (jo.paymentStatus === PAYMENT_STATUSES.UNPAID ? "destructive" : "secondary") }>{jo.paymentStatus}</Badge></TableCell>
                     <TableCell className="text-right">{currency}{(Number(jo.grandTotal) || 0).toFixed(2)}</TableCell>
@@ -456,8 +499,8 @@ export default function JobOrdersPage() {
           ) : (
             <div className="flex flex-col items-center justify-center gap-4 py-10 text-muted-foreground">
                 <ClipboardList className="h-16 w-16" />
-                <p className="text-lg">No job orders or sales found.</p>
-                <p>Get started by creating a new job order or making a direct sale.</p>
+                <p className="text-lg">{searchTerm || statusFilter !== "ALL" ? "No job orders match your criteria." : "No job orders or sales found."}</p>
+                {!(searchTerm || statusFilter !== "ALL") && <p>Get started by creating a new job order or making a direct sale.</p>}
             </div>
           )}
         </CardContent>
@@ -483,4 +526,3 @@ export default function JobOrdersPage() {
     </div>
   );
 }
-

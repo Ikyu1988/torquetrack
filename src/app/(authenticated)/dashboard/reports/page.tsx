@@ -12,7 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useToast } from "@/hooks/use-toast";
 import type { JobOrder, Customer, Mechanic, Part, Service, Payment, ShopSettings, JobOrderServiceItem, CommissionType, JobOrderStatus } from "@/types";
 import { JOB_ORDER_STATUS_OPTIONS, JOB_ORDER_STATUSES, COMMISSION_TYPES } from "@/lib/constants";
-import { format } from "date-fns";
+import { format, startOfMonth } from "date-fns";
 
 const convertToCSV = (data: any[], headers?: string[]): string => {
   if (data.length === 0) return "";
@@ -52,7 +52,7 @@ export default function ReportsPage() {
   const { toast } = useToast();
   const [isMounted, setIsMounted] = useState(false);
 
-  const [startDate, setStartDate] = useState<Date | undefined>(new Date(new Date().getFullYear(), new Date().getMonth(), 1));
+  const [startDate, setStartDate] = useState<Date | undefined>(startOfMonth(new Date()));
   const [endDate, setEndDate] = useState<Date | undefined>(new Date());
   const [selectedStatus, setSelectedStatus] = useState<JobOrderStatus | "ALL">("ALL");
   const [selectedMechanicId, setSelectedMechanicId] = useState<string | "ALL">("ALL");
@@ -120,7 +120,7 @@ export default function ReportsPage() {
     setTimeout(() => { 
       try {
         const filteredJobOrders = allJobOrders.filter(jo => {
-          if (!startDate || !endDate) return true; // For reports not using date filter yet
+          if (!startDate || !endDate) return true; 
           const joDate = new Date(jo.createdAt);
           const inDateRange = joDate >= startDate && joDate <= endDate;
           const statusMatch = selectedStatus === "ALL" || jo.status === selectedStatus;
@@ -500,4 +500,3 @@ export default function ReportsPage() {
     </div>
   );
 }
-

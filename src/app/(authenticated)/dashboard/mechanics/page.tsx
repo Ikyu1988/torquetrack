@@ -1,10 +1,10 @@
 
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { PlusCircle, UserCog, Pencil, Trash2 } from "lucide-react";
+import { PlusCircle, UserCog, Pencil, Trash2, Search } from "lucide-react";
 import Link from "next/link";
 import {
   Table,
@@ -27,6 +27,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import type { Mechanic } from "@/types";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 
 const initialMechanics: Mechanic[] = [
   {
@@ -90,7 +91,8 @@ if (typeof window !== 'undefined') {
 
 export default function MechanicsPage() {
   const { toast } = useToast();
-  const [mechanics, setMechanics] = useState<Mechanic[]>([]);
+  const [allMechanics, setAllMechanics] = useState<Mechanic[]>([]);
+  const [searchTerm, setSearchTerm] = useState("");
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [mechanicToDelete, setMechanicToDelete] = useState<Mechanic | null>(null);
   const [isMounted, setIsMounted] = useState(false);
@@ -98,13 +100,13 @@ export default function MechanicsPage() {
   useEffect(() => {
     setIsMounted(true);
     if (typeof window !== 'undefined' && (window as any).__mechanicStore) {
-      setMechanics([...(window as any).__mechanicStore.mechanics]);
+      setAllMechanics([...(window as any).__mechanicStore.mechanics]);
     }
   }, []);
 
   const refreshMechanics = () => {
     if (typeof window !== 'undefined' && (window as any).__mechanicStore) {
-      setMechanics([...(window as any).__mechanicStore.mechanics]);
+      setAllMechanics([...(window as any).__mechanicStore.mechanics]);
     }
   };
 
@@ -114,13 +116,13 @@ export default function MechanicsPage() {
     const interval = setInterval(() => {
       if (typeof window !== 'undefined' && (window as any).__mechanicStore) {
         const storeMechanics = (window as any).__mechanicStore.mechanics;
-        if (JSON.stringify(storeMechanics) !== JSON.stringify(mechanics)) {
+        if (JSON.stringify(storeMechanics) !== JSON.stringify(allMechanics)) {
           refreshMechanics();
         }
       }
     }, 1000);
     return () => clearInterval(interval);
-  }, [mechanics, isMounted]);
+  }, [allMechanics, isMounted]);
 
   const handleDeleteMechanic = (mechanic: Mechanic) => {
     setMechanicToDelete(mechanic);
@@ -141,6 +143,15 @@ export default function MechanicsPage() {
     setShowDeleteDialog(false);
     setMechanicToDelete(null);
   };
+
+  const filteredMechanics = useMemo(() => {
+    if (!searchTerm) return allMechanics;
+    const lowercasedFilter = searchTerm.toLowerCase();
+    return allMechanics.filter(mechanic =>
+      mechanic.name.toLowerCase().includes(lowercasedFilter) ||
+      (mechanic.specializations && mechanic.specializations.toLowerCase().includes(lowercasedFilter))
+    );
+  }, [allMechanics, searchTerm]);
   
   if (!isMounted) {
     return <div className="flex justify-center items-center h-screen"><p>Loading mechanics...</p></div>; 
@@ -149,7 +160,7 @@ export default function MechanicsPage() {
   return (
     <div className="flex flex-col gap-6">
       <Card className="shadow-lg">
-        <CardHeader className="flex flex-row items-center justify-between">
+        <CardHeader className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-3">
               <UserCog className="h-6 w-6 text-primary" />
@@ -157,14 +168,26 @@ export default function MechanicsPage() {
             </div>
             <CardDescription>Manage your team of mechanics.</CardDescription>
           </div>
-          <Button asChild>
-            <Link href="/dashboard/mechanics/new">
-              <PlusCircle className="mr-2 h-4 w-4" /> Add New Mechanic
-            </Link>
-          </Button>
+          <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
+            <div className="relative w-full md:w-64">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                type="search"
+                placeholder="Search mechanics..."
+                className="pl-8 w-full"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+            <Button asChild className="w-full sm:w-auto">
+              <Link href="/dashboard/mechanics/new">
+                <PlusCircle className="mr-2 h-4 w-4" /> Add New Mechanic
+              </Link>
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
-          {mechanics.length > 0 ? (
+          {filteredMechanics.length > 0 ? (
             <Table>
               <TableHeader>
                 <TableRow>
@@ -175,7 +198,7 @@ export default function MechanicsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {mechanics.map((mechanic) => (
+                {filteredMechanics.map((mechanic) => (
                   <TableRow key={mechanic.id}>
                     <TableCell className="font-medium">{mechanic.name}</TableCell>
                     <TableCell className="max-w-xs truncate">{mechanic.specializations || "-"}</TableCell>
@@ -208,8 +231,8 @@ export default function MechanicsPage() {
           ) : (
             <div className="flex flex-col items-center justify-center gap-4 py-10 text-muted-foreground">
                 <UserCog className="h-16 w-16" />
-                <p className="text-lg">No mechanics found.</p>
-                <p>Get started by adding a new mechanic.</p>
+                <p className="text-lg">{searchTerm ? "No mechanics match your search." : "No mechanics found."}</p>
+                {!searchTerm && <p>Get started by adding a new mechanic.</p>}
             </div>
           )}
         </CardContent>
