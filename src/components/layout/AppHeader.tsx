@@ -8,6 +8,7 @@ import { usePathname } from "next/navigation";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"; // Added SheetHeader, SheetTitle
 import { SidebarNav } from "@/components/navigation/SidebarNav";
 import { AppLogo } from "./AppLogo";
+import { cn } from "@/lib/utils";
 
 export function AppHeader({ toggleSidebar, isSidebarCollapsed }: { toggleSidebar?: () => void, isSidebarCollapsed?: boolean }) {
   const pathname = usePathname();
@@ -16,7 +17,9 @@ export function AppHeader({ toggleSidebar, isSidebarCollapsed }: { toggleSidebar
   const capitalizedTitle = pageTitle.charAt(0).toUpperCase() + pageTitle.slice(1);
 
   return (
-    <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-background/80 backdrop-blur-md px-4 md:px-6">
+    <header className={cn(
+        "sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-background/80 backdrop-blur-md px-4 md:px-6 print:hidden"
+      )}>
       <div className="md:hidden">
          <Sheet>
           <SheetTrigger asChild>

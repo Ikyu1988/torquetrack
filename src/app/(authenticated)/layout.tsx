@@ -59,7 +59,7 @@ export default function AuthenticatedLayout({
   return (
     <div className="flex min-h-screen w-full bg-muted/40">
       <aside className={cn(
-        "hidden md:flex fixed h-full z-40 transition-all duration-300 ease-in-out",
+        "hidden md:flex fixed h-full z-40 transition-all duration-300 ease-in-out print:hidden",
         isSidebarCollapsed ? "w-20" : "w-64"
       )}>
         <SidebarNav collapsed={isSidebarCollapsed} />
