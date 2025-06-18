@@ -122,7 +122,7 @@ export default function DirectSalesPage() {
       if ((window as any).__settingsStore) setShopSettings((window as any).__settingsStore.getSettings());
       if ((window as any).__jobOrderStore) {
         const allJobOrders: JobOrder[] = (window as any).__jobOrderStore.jobOrders || [];
-        const sales = allJobOrders.filter(jo => jo.status === JOB_ORDER_STATUSES.SALE_COMPLETED);
+        const sales = allJobOrders.map(jo => (window as any).__jobOrderStore.getJobOrderById ? (window as any).__jobOrderStore.getJobOrderById(jo.id) : jo).filter(Boolean).filter(jo => jo.status === JOB_ORDER_STATUSES.SALE_COMPLETED);
         setCompletedSales(sales);
       }
     }
@@ -142,7 +142,7 @@ export default function DirectSalesPage() {
 
   function onSubmit(data: DirectSaleFormValues) {
     let newSaleOrder: JobOrder | null = null;
-    if (typeof window !== 'undefined' && (window as any).__jobOrderStore) {
+    if (typeof window !== 'undefined' && (window as any).__jobOrderStore && typeof (window as any).__jobOrderStore.addJobOrder === 'function') {
         const saleOrderData: AddJobOrderInput = {
             customerId: data.customerId === WALK_IN_CUSTOMER_IDENTIFIER ? undefined : data.customerId,
             motorcycleId: undefined, 
@@ -153,25 +153,42 @@ export default function DirectSalesPage() {
             discountAmount: data.discountAmount === '' ? undefined : Number(data.discountAmount),
             paymentStatus: PAYMENT_STATUSES.PAID, 
             initialPaymentMethod: data.paymentMethod, 
-            initialPaymentNotes: data.paymentNotes || `Payment for direct sale`, 
+            initialPaymentNotes: data.paymentNotes || `Payment for direct sale`,
+            taxAmount: calculatedTaxAmountForDisplay,
         };
       
-      newSaleOrder = (window as any).__jobOrderStore.addJobOrder(saleOrderData);
+      try {
+        newSaleOrder = (window as any).__jobOrderStore.addJobOrder(saleOrderData);
 
-      if (newSaleOrder) {
+        if (newSaleOrder && typeof newSaleOrder.id === 'string') { // Added check for valid newSaleOrder
+          toast({
+            title: "Sale Completed",
+            description: `Direct sale #${newSaleOrder.id.substring(0,6)} processed successfully. Grand Total: ${currency}${newSaleOrder.grandTotal.toFixed(2)}`,
+          });
+          form.reset({ customerId: undefined, partsUsed: [], discountAmount: undefined, paymentMethod: "Cash", paymentNotes: "" });
+          fetchAndSetData(); // Refresh lists after sale
+        } else {
+           toast({
+            title: "Processing Error",
+            description: "Sale processing returned an unexpected result. Please check console for details.",
+            variant: "destructive",
+          });
+          console.error("newSaleOrder was not a valid JobOrder object:", newSaleOrder);
+        }
+      } catch (e: any) {
+        console.error("Error during sale processing:", e);
         toast({
-          title: "Sale Completed",
-          description: `Direct sale #${newSaleOrder.id.substring(0,6)} processed successfully. Grand Total: ${currency}${newSaleOrder.grandTotal.toFixed(2)}`,
-        });
-        form.reset({ customerId: undefined, partsUsed: [], discountAmount: undefined, paymentMethod: "Cash", paymentNotes: "" });
-        fetchAndSetData(); // Refresh lists after sale
-      } else {
-         toast({
-          title: "Error",
-          description: "Failed to process sale. Please try again.",
-          variant: "destructive",
+            title: "Store Operation Error",
+            description: `Failed to process sale due to a store error: ${e.message || "Unknown error"}`,
+            variant: "destructive",
         });
       }
+    } else {
+       toast({
+        title: "Store Not Ready",
+        description: "Cannot process sale. The job order system is not available or not fully loaded. Please try reloading or wait a moment.",
+        variant: "destructive",
+      });
     }
   }
   
@@ -477,4 +494,3 @@ export default function DirectSalesPage() {
     </div>
   );
 }
-
