@@ -25,10 +25,10 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
-import type { PurchaseOrder, Supplier, ShopSettings } from "@/types";
+import type { PurchaseOrder, Supplier, ShopSettings, PurchaseRequisitionStatus } from "@/types"; // Added PurchaseRequisitionStatus
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
-import { PURCHASE_ORDER_STATUSES, PURCHASE_ORDER_STATUS_OPTIONS } from "@/lib/constants";
+import { PURCHASE_ORDER_STATUSES, PURCHASE_ORDER_STATUS_OPTIONS, PURCHASE_REQUISITION_STATUSES } from "@/lib/constants"; // Added PURCHASE_REQUISITION_STATUSES
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
@@ -74,7 +74,7 @@ if (typeof window !== 'undefined') {
         if (newPurchaseOrder.purchaseRequisitionId && (window as any).__purchaseRequisitionStore) {
             const req = (window as any).__purchaseRequisitionStore.getRequisitionById(newPurchaseOrder.purchaseRequisitionId);
             if (req) {
-                req.status = PURCHASE_REQUISITION_STATUSES.ORDERED;
+                req.status = PURCHASE_REQUISITION_STATUSES.ORDERED as PurchaseRequisitionStatus;
                 (window as any).__purchaseRequisitionStore.updateRequisition(req);
             }
         }
@@ -106,6 +106,10 @@ if (typeof window !== 'undefined') {
         return (window as any).__purchaseOrderStore.purchaseOrders.find((po: PurchaseOrder) => po.id === purchaseOrderId);
       }
     };
+  } else {
+      if ((window as any).__purchaseOrderStore && (!(window as any).__purchaseOrderStore.purchaseOrders || (window as any).__purchaseOrderStore.purchaseOrders.length === 0)) {
+        (window as any).__purchaseOrderStore.purchaseOrders = [...initialPurchaseOrders];
+    }
   }
 }
 
@@ -132,10 +136,16 @@ export default function PurchaseOrdersPage() {
     setIsMounted(true);
     if (typeof window !== 'undefined') {
       if ((window as any).__purchaseOrderStore) {
-        setAllPurchaseOrders([...(window as any).__purchaseOrderStore.purchaseOrders]);
+        const storePOs = (window as any).__purchaseOrderStore.purchaseOrders;
+        if (storePOs && storePOs.length > 0) {
+            setAllPurchaseOrders([...storePOs]);
+        } else if (initialPurchaseOrders.length > 0 && (!storePOs || storePOs.length === 0)) {
+            (window as any).__purchaseOrderStore.purchaseOrders = [...initialPurchaseOrders];
+            setAllPurchaseOrders([...initialPurchaseOrders]);
+        }
       }
       if ((window as any).__supplierStore) {
-        setSuppliers([...(window as any).__supplierStore.suppliers]);
+        setSuppliers([...((window as any).__supplierStore.suppliers || [])]);
       }
       if ((window as any).__settingsStore) {
         setShopSettings((window as any).__settingsStore.getSettings());

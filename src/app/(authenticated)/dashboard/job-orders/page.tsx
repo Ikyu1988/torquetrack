@@ -153,9 +153,6 @@ if (typeof window !== 'undefined') {
             const partIndex = (window as any).__inventoryStore.parts.findIndex((p: Part) => p.id === item.partId);
             if (partIndex !== -1) {
               (window as any).__inventoryStore.parts[partIndex].stockQuantity -= item.quantity;
-              if ((window as any).__inventoryStore.parts[partIndex].stockQuantity < 0) {
-                console.warn(`Stock for part ${item.partName} (${item.partId}) is now negative: ${(window as any).__inventoryStore.parts[partIndex].stockQuantity}`);
-              }
             }
           });
         }
@@ -197,9 +194,6 @@ if (typeof window !== 'undefined') {
                 const partIndex = (window as any).__inventoryStore.parts.findIndex((p: Part) => p.id === newItem.partId);
                 if(partIndex !== -1) {
                     (window as any).__inventoryStore.parts[partIndex].stockQuantity -= newItem.quantity;
-                     if ((window as any).__inventoryStore.parts[partIndex].stockQuantity < 0) {
-                        console.warn(`Stock for part ${newItem.partName} (${newItem.partId}) is now negative after update: ${(window as any).__inventoryStore.parts[partIndex].stockQuantity}`);
-                    }
                 }
              });
           }
@@ -274,6 +268,10 @@ if (typeof window !== 'undefined') {
         return false;
       }
     };
+  } else {
+     if ((window as any).__jobOrderStore && (!(window as any).__jobOrderStore.jobOrders || (window as any).__jobOrderStore.jobOrders.length === 0)) {
+        (window as any).__jobOrderStore.jobOrders = [...initialJobOrders];
+    }
   }
 }
 
@@ -296,22 +294,28 @@ export default function JobOrdersPage() {
     setIsMounted(true);
     if (typeof window !== 'undefined') {
       if ((window as any).__jobOrderStore) {
-        const ordersFromStore = (window as any).__jobOrderStore.jobOrders.map((jo: JobOrder) => {
+        const ordersFromStore = ((window as any).__jobOrderStore.jobOrders || []).map((jo: JobOrder) => {
             if ((window as any).__paymentStore && (window as any).__jobOrderStore.getJobOrderById) { 
                  return (window as any).__jobOrderStore.getJobOrderById(jo.id);
             }
             return jo;
         }).filter(Boolean); 
-        setAllJobOrders([...ordersFromStore]);
+
+        if (ordersFromStore.length > 0) {
+            setAllJobOrders([...ordersFromStore]);
+        } else if (initialJobOrders.length > 0 && (!ordersFromStore || ordersFromStore.length === 0)) {
+            (window as any).__jobOrderStore.jobOrders = [...initialJobOrders]; // Prime the store if empty
+            setAllJobOrders([...initialJobOrders]);
+        }
       }
       if ((window as any).__customerStore) { 
-        setCustomers([...(window as any).__customerStore.customers]);
+        setCustomers([...((window as any).__customerStore.customers || [])]);
       }
       if ((window as any).__motorcycleStore) { 
-        setMotorcycles([...(window as any).__motorcycleStore.motorcycles]);
+        setMotorcycles([...((window as any).__motorcycleStore.motorcycles || [])]);
       }
       if ((window as any).__settingsStore) {
-        setShopSettings((window as any).__settingsStore.getSettings());
+        setShopSettings((window as any).__settingsStore.getSettings() || null);
       }
     }
   }, []);
@@ -332,7 +336,7 @@ export default function JobOrdersPage() {
 
   const refreshJobOrders = () => {
     if (typeof window !== 'undefined' && (window as any).__jobOrderStore) {
-       const ordersFromStore = (window as any).__jobOrderStore.jobOrders.map((jo: JobOrder) => {
+       const ordersFromStore = ((window as any).__jobOrderStore.jobOrders || []).map((jo: JobOrder) => {
             if ((window as any).__paymentStore && (window as any).__jobOrderStore.getJobOrderById) { 
                  return (window as any).__jobOrderStore.getJobOrderById(jo.id);
             }

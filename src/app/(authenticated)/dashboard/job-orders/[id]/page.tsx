@@ -183,7 +183,7 @@ export default function ViewJobOrderPage() {
             <Button variant="outline" onClick={() => window.print()}>
                 <Printer className="mr-2 h-4 w-4" /> Print
             </Button>
-            <Button onClick={() => alert("Email functionality coming soon!")}>
+            <Button onClick={() => alert("Email functionality is not yet implemented. This would email details to the customer.")}>
                 <Send className="mr-2 h-4 w-4" /> Email to Customer
             </Button>
             <Button asChild>

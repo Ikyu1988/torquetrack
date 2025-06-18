@@ -140,6 +140,10 @@ if (typeof window !== 'undefined') {
         return (window as any).__inventoryStore.parts.find((p: Part) => p.id === partId);
       }
     };
+  } else {
+    if ((window as any).__inventoryStore && (!(window as any).__inventoryStore.parts || (window as any).__inventoryStore.parts.length === 0)) {
+        (window as any).__inventoryStore.parts = [...initialParts];
+    }
   }
 }
 
@@ -160,7 +164,13 @@ export default function InventoryPage() {
     setIsMounted(true);
     if (typeof window !== 'undefined') {
       if ((window as any).__inventoryStore) {
-        setAllParts([...(window as any).__inventoryStore.parts]);
+        const storeParts = (window as any).__inventoryStore.parts;
+        if (storeParts && storeParts.length > 0) {
+            setAllParts([...storeParts]);
+        } else if (initialParts.length > 0 && (!storeParts || storeParts.length === 0)) {
+            (window as any).__inventoryStore.parts = [...initialParts];
+            setAllParts([...initialParts]);
+        }
       }
       if ((window as any).__settingsStore) {
         const currentSettings = (window as any).__settingsStore.getSettings();

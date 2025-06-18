@@ -97,6 +97,10 @@ if (typeof window !== 'undefined') {
         return (window as any).__serviceStore.services.find((s: Service) => s.id === serviceId);
       }
     };
+  } else {
+     if ((window as any).__serviceStore && (!(window as any).__serviceStore.services || (window as any).__serviceStore.services.length === 0)) {
+        (window as any).__serviceStore.services = [...initialServices];
+    }
   }
 }
 
@@ -115,7 +119,13 @@ export default function ServicesPage() {
     setIsMounted(true);
     if (typeof window !== 'undefined') {
       if ((window as any).__serviceStore) {
-        setAllServices([...(window as any).__serviceStore.services]);
+        const storeServices = (window as any).__serviceStore.services;
+        if (storeServices && storeServices.length > 0) {
+            setAllServices([...storeServices]);
+        } else if (initialServices.length > 0 && (!storeServices || storeServices.length === 0)) {
+            (window as any).__serviceStore.services = [...initialServices];
+            setAllServices([...initialServices]);
+        }
       }
       if ((window as any).__settingsStore) {
         setShopSettings((window as any).__settingsStore.getSettings());

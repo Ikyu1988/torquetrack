@@ -89,6 +89,11 @@ if (typeof window !== 'undefined') {
         return (window as any).__customerStore.customers.find((c: Customer) => c.id === customerId);
       }
     };
+  } else {
+    // Ensure initialCustomers are loaded if the store was somehow created but empty
+    if ((window as any).__customerStore && (!(window as any).__customerStore.customers || (window as any).__customerStore.customers.length === 0)) {
+        (window as any).__customerStore.customers = [...initialCustomers];
+    }
   }
 }
 
@@ -104,7 +109,15 @@ export default function CustomersPage() {
   useEffect(() => {
     setIsMounted(true);
     if (typeof window !== 'undefined' && (window as any).__customerStore) {
-      setAllCustomers([...(window as any).__customerStore.customers]);
+      // Ensure the local state is initialized from the store, which might have already been populated
+      const storeCustomers = (window as any).__customerStore.customers;
+      if (storeCustomers && storeCustomers.length > 0) {
+        setAllCustomers([...storeCustomers]);
+      } else if (initialCustomers.length > 0 && (!storeCustomers || storeCustomers.length === 0)) {
+        // Fallback to initialCustomers if store is empty but should have data
+        (window as any).__customerStore.customers = [...initialCustomers];
+        setAllCustomers([...initialCustomers]);
+      }
     }
   }, []);
 
@@ -120,7 +133,6 @@ export default function CustomersPage() {
     const interval = setInterval(() => {
       if (typeof window !== 'undefined' && (window as any).__customerStore) {
         const storeCustomers = (window as any).__customerStore.customers;
-        // Simple comparison, could be more robust for deep object changes if necessary
         if (JSON.stringify(storeCustomers) !== JSON.stringify(allCustomers)) {
           refreshCustomers();
         }

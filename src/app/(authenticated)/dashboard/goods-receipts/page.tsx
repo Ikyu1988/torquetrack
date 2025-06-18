@@ -15,7 +15,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
-import type { GoodsReceipt, PurchaseOrder, Supplier, ShopSettings } from "@/types";
+import type { GoodsReceipt, PurchaseOrder, Supplier, ShopSettings, GoodsReceiptStatus } from "@/types"; // Added GoodsReceiptStatus
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { GOODS_RECEIPT_STATUSES, GOODS_RECEIPT_STATUS_OPTIONS } from "@/lib/constants";
@@ -68,7 +68,8 @@ if (typeof window !== 'undefined') {
                 });
             }
           } else if (oldReceipt.status === GOODS_RECEIPT_STATUSES.COMPLETED && updatedReceipt.status !== GOODS_RECEIPT_STATUSES.COMPLETED) {
-            console.warn("Reverting stock due to Goods Receipt status change is not fully implemented for this prototype.");
+            // Stock reversion logic would be complex and potentially error-prone for a mock store.
+            // For a real app, this would need careful handling (e.g., audit logs, preventing reversal if stock is used).
           }
           return true;
         }
@@ -81,6 +82,10 @@ if (typeof window !== 'undefined') {
         return (window as any).__goodsReceiptStore.goodsReceipts.filter((gr: GoodsReceipt) => gr.purchaseOrderId === poId);
       }
     };
+  } else {
+     if ((window as any).__goodsReceiptStore && (!(window as any).__goodsReceiptStore.goodsReceipts || (window as any).__goodsReceiptStore.goodsReceipts.length === 0)) {
+        (window as any).__goodsReceiptStore.goodsReceipts = [...initialGoodsReceipts];
+    }
   }
 }
 
@@ -92,8 +97,6 @@ export default function GoodsReceiptsPage() {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [shopSettings, setShopSettings] = useState<ShopSettings | null>(null);
   const [isMounted, setIsMounted] = useState(false);
-
-  const currency = useMemo(() => shopSettings?.currencySymbol || '₱', [shopSettings]);
   
   const supplierMap = useMemo(() => {
     const map = new Map<string, string>();
@@ -105,10 +108,16 @@ export default function GoodsReceiptsPage() {
     setIsMounted(true);
     if (typeof window !== 'undefined') {
       if ((window as any).__goodsReceiptStore) {
-        setAllGoodsReceipts([...(window as any).__goodsReceiptStore.goodsReceipts]);
+        const storeGRs = (window as any).__goodsReceiptStore.goodsReceipts;
+         if (storeGRs && storeGRs.length > 0) {
+            setAllGoodsReceipts([...storeGRs]);
+        } else if (initialGoodsReceipts.length > 0 && (!storeGRs || storeGRs.length === 0)) {
+            (window as any).__goodsReceiptStore.goodsReceipts = [...initialGoodsReceipts];
+            setAllGoodsReceipts([...initialGoodsReceipts]);
+        }
       }
       if ((window as any).__supplierStore) {
-        setSuppliers([...(window as any).__supplierStore.suppliers]);
+        setSuppliers([...((window as any).__supplierStore.suppliers || [])]);
       }
       if ((window as any).__settingsStore) {
         setShopSettings((window as any).__settingsStore.getSettings());
@@ -223,7 +232,6 @@ export default function GoodsReceiptsPage() {
                           <span className="sr-only">View</span>
                         </Link>
                       </Button>
-                      {/* Edit/Delete for Goods Receipts might be complex depending on inventory impact */}
                     </TableCell>
                   </TableRow>
                 ))}

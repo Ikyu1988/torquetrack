@@ -86,6 +86,10 @@ if (typeof window !== 'undefined') {
         return (window as any).__mechanicStore.mechanics.find((m: Mechanic) => m.id === mechanicId);
       }
     };
+  } else {
+     if ((window as any).__mechanicStore && (!(window as any).__mechanicStore.mechanics || (window as any).__mechanicStore.mechanics.length === 0)) {
+        (window as any).__mechanicStore.mechanics = [...initialMechanics];
+    }
   }
 }
 
@@ -100,7 +104,13 @@ export default function MechanicsPage() {
   useEffect(() => {
     setIsMounted(true);
     if (typeof window !== 'undefined' && (window as any).__mechanicStore) {
-      setAllMechanics([...(window as any).__mechanicStore.mechanics]);
+      const storeMechanics = (window as any).__mechanicStore.mechanics;
+      if (storeMechanics && storeMechanics.length > 0) {
+          setAllMechanics([...storeMechanics]);
+      } else if (initialMechanics.length > 0 && (!storeMechanics || storeMechanics.length === 0)) {
+          (window as any).__mechanicStore.mechanics = [...initialMechanics];
+          setAllMechanics([...initialMechanics]);
+      }
     }
   }, []);
 

@@ -76,7 +76,6 @@ if (typeof window !== 'undefined') {
         return false;
       },
       deleteSupplier: (supplierId: string) => {
-        // Check if supplier is used in POs - for future enhancement
         (window as any).__supplierStore.suppliers = (window as any).__supplierStore.suppliers.filter((s: Supplier) => s.id !== supplierId);
         return true;
       },
@@ -84,6 +83,10 @@ if (typeof window !== 'undefined') {
         return (window as any).__supplierStore.suppliers.find((s: Supplier) => s.id === supplierId);
       }
     };
+  } else {
+     if ((window as any).__supplierStore && (!(window as any).__supplierStore.suppliers || (window as any).__supplierStore.suppliers.length === 0)) {
+        (window as any).__supplierStore.suppliers = [...initialSuppliers];
+    }
   }
 }
 
@@ -98,7 +101,13 @@ export default function SuppliersPage() {
   useEffect(() => {
     setIsMounted(true);
     if (typeof window !== 'undefined' && (window as any).__supplierStore) {
-      setAllSuppliers([...(window as any).__supplierStore.suppliers]);
+       const storeSuppliers = (window as any).__supplierStore.suppliers;
+        if (storeSuppliers && storeSuppliers.length > 0) {
+            setAllSuppliers([...storeSuppliers]);
+        } else if (initialSuppliers.length > 0 && (!storeSuppliers || storeSuppliers.length === 0)) {
+            (window as any).__supplierStore.suppliers = [...initialSuppliers];
+            setAllSuppliers([...initialSuppliers]);
+        }
     }
   }, []);
 

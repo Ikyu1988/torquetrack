@@ -99,6 +99,10 @@ if (typeof window !== 'undefined') {
         return (window as any).__purchaseRequisitionStore.requisitions.find((r: PurchaseRequisition) => r.id === requisitionId);
       }
     };
+  } else {
+     if ((window as any).__purchaseRequisitionStore && (!(window as any).__purchaseRequisitionStore.requisitions || (window as any).__purchaseRequisitionStore.requisitions.length === 0)) {
+        (window as any).__purchaseRequisitionStore.requisitions = [...initialRequisitions];
+    }
   }
 }
 
@@ -118,7 +122,13 @@ export default function PurchaseRequisitionsPage() {
     setIsMounted(true);
     if (typeof window !== 'undefined') {
       if ((window as any).__purchaseRequisitionStore) {
-        setAllRequisitions([...(window as any).__purchaseRequisitionStore.requisitions]);
+         const storeRequisitions = (window as any).__purchaseRequisitionStore.requisitions;
+        if (storeRequisitions && storeRequisitions.length > 0) {
+            setAllRequisitions([...storeRequisitions]);
+        } else if (initialRequisitions.length > 0 && (!storeRequisitions || storeRequisitions.length === 0)) {
+            (window as any).__purchaseRequisitionStore.requisitions = [...initialRequisitions];
+            setAllRequisitions([...initialRequisitions]);
+        }
       }
        if ((window as any).__settingsStore) {
         setShopSettings((window as any).__settingsStore.getSettings());
