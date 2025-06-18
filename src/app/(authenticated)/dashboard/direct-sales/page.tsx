@@ -16,8 +16,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import Link from "next/link";
-import { ArrowLeft, ShoppingCart, DollarSign, PlusCircle, Trash2 } from "lucide-react";
+import { ShoppingCart, DollarSign, PlusCircle, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
 import type { JobOrder, Customer, Part, PaymentMethod, ShopSettings } from "@/types";
@@ -44,6 +43,13 @@ const directSaleFormSchema = z.object({
 });
 
 type DirectSaleFormValues = z.infer<typeof directSaleFormSchema>;
+
+// Type for the input to addJobOrder, matching the one in job-orders/page.tsx store
+type AddJobOrderInput = Omit<JobOrder, 'id' | 'createdAt' | 'updatedAt' | 'createdByUserId' | 'grandTotal' | 'amountPaid' | 'paymentHistory'> & {
+  initialPaymentMethod?: PaymentMethod;
+  initialPaymentNotes?: string;
+};
+
 
 export default function DirectSalesPage() {
   const { toast } = useToast();
@@ -77,14 +83,14 @@ export default function DirectSalesPage() {
   }, [partsUsedWatch]);
 
   const taxAmount = useMemo(() => {
-    if (!shopSettings || shopSettings.defaultTaxRate === undefined) return 0;
-    const currentSubTotal = subTotalParts - (Number(discountAmountWatch) || 0);
-    return currentSubTotal * (shopSettings.defaultTaxRate / 100);
+    if (!shopSettings || shopSettings.defaultTaxRate === undefined || shopSettings.defaultTaxRate <= 0) return 0;
+    const currentSubTotalNet = subTotalParts - (Number(discountAmountWatch) || 0);
+    return currentSubTotalNet * (shopSettings.defaultTaxRate / 100);
   }, [subTotalParts, discountAmountWatch, shopSettings]);
 
   const grandTotal = useMemo(() => {
-    const currentSubTotal = subTotalParts - (Number(discountAmountWatch) || 0);
-    return currentSubTotal + taxAmount;
+    const currentSubTotalNet = subTotalParts - (Number(discountAmountWatch) || 0);
+    return currentSubTotalNet + taxAmount;
   }, [subTotalParts, discountAmountWatch, taxAmount]);
 
   useEffect(() => {
@@ -98,48 +104,32 @@ export default function DirectSalesPage() {
 
   function onSubmit(data: DirectSaleFormValues) {
     let newSaleOrder: JobOrder | null = null;
-    if (typeof window !== 'undefined' && (window as any).__jobOrderStore && (window as any).__paymentStore) {
-        const saleOrderData: Omit<JobOrder, 'id' | 'createdAt' | 'updatedAt' | 'createdByUserId' | 'grandTotal' | 'amountPaid' | 'paymentHistory'> & {grandTotal?: number} = {
+    if (typeof window !== 'undefined' && (window as any).__jobOrderStore) {
+        const saleOrderData: AddJobOrderInput = {
             customerId: data.customerId || undefined,
-            motorcycleId: undefined, // No motorcycle for direct sales
+            motorcycleId: undefined, 
             status: JOB_ORDER_STATUSES.SALE_COMPLETED,
-            servicesPerformed: [], // No services
-            partsUsed: data.partsUsed.map(p => ({...p})), // Ensure it's a new array of objects
+            servicesPerformed: [], 
+            partsUsed: data.partsUsed.map(p => ({...p})), 
             diagnostics: "Direct Parts Sale",
             discountAmount: data.discountAmount === '' ? undefined : Number(data.discountAmount),
-            taxAmount: taxAmount,
-            paymentStatus: PAYMENT_STATUSES.PAID, // Assume direct sales are paid immediately
-             // grandTotal will be calculated by addJobOrder, but we pass our calculation for reference/consistency
+            taxAmount: taxAmount, // Pass the calculated tax amount
+            paymentStatus: PAYMENT_STATUSES.PAID,
+            initialPaymentMethod: data.paymentMethod, // Pass payment method from form
+            initialPaymentNotes: data.paymentNotes || `Payment for direct sale`, // Pass payment notes
         };
       
       newSaleOrder = (window as any).__jobOrderStore.addJobOrder(saleOrderData);
 
       if (newSaleOrder) {
-         // Record payment for this new sale order
-         const paymentData = {
-            jobOrderId: newSaleOrder.id,
-            amount: newSaleOrder.grandTotal, // Paid in full
-            paymentDate: new Date(),
-            method: data.paymentMethod,
-            notes: data.paymentNotes || `Payment for direct sale #${newSaleOrder.id.substring(0,6)}`,
-            processedByUserId: "current_user_placeholder", // Replace with actual user ID
-        };
-        const savedPayment = (window as any).__paymentStore.addPayment(paymentData);
-        (window as any).__jobOrderStore.addPaymentToJobOrder(newSaleOrder.id, savedPayment);
-
-
         toast({
           title: "Sale Completed",
-          description: `Direct sale #${newSaleOrder.id.substring(0,6)} processed successfully.`,
+          description: `Direct sale #${newSaleOrder.id.substring(0,6)} processed successfully. Grand Total: ${shopSettings?.currencySymbol || '$'}${newSaleOrder.grandTotal.toFixed(2)}`,
         });
         form.reset({ customerId: "", partsUsed: [], discountAmount: undefined, paymentMethod: "Cash", paymentNotes: "" });
-        // Refresh available parts as stock might have changed
         if ((window as any).__inventoryStore) {
              setAvailableParts((window as any).__inventoryStore.parts.filter((p: Part) => p.isActive && p.stockQuantity > 0));
         }
-
-        // Optional: Redirect to a receipt page or job order view
-        // router.push(`/dashboard/job-orders/${newSaleOrder.id}`); 
       } else {
          toast({
           title: "Error",
@@ -225,7 +215,7 @@ export default function DirectSalesPage() {
                               <SelectContent>
                                 {availableParts.length === 0 && <SelectItem value="loading" disabled>No parts available or in stock.</SelectItem>}
                                 {availableParts.map(part => (
-                                  <SelectItem key={part.id} value={part.id}>{part.name} (Stock: {part.stockQuantity}, Price: {shopSettings?.currencySymbol || '$'}{part.price.toFixed(2)})</SelectItem>
+                                  <SelectItem key={part.id} value={part.id} disabled={part.stockQuantity <=0 } >{part.name} (Stock: {part.stockQuantity}, Price: {shopSettings?.currencySymbol || '$'}{part.price.toFixed(2)})</SelectItem>
                                 ))}
                               </SelectContent>
                             </Select>
@@ -274,7 +264,26 @@ export default function DirectSalesPage() {
                     </Button>
                   </Card>
                 ))}
-                {partFields.length === 0 && <p className="text-sm text-muted-foreground p-4 text-center">No parts added to the sale yet.</p>}
+                {form.formState.errors.partsUsed && !form.formState.errors.partsUsed.root && partFields.length > 0 && (
+                    <p className="text-sm font-medium text-destructive">
+                        {form.formState.errors.partsUsed.message}
+                    </p>
+                )}
+                {partFields.length === 0 && (
+                    <>
+                        <p className="text-sm text-muted-foreground p-4 text-center">No parts added to the sale yet.</p>
+                        {form.formState.errors.partsUsed?.root && (
+                             <p className="text-sm font-medium text-destructive text-center">
+                                {form.formState.errors.partsUsed.root.message}
+                            </p>
+                        )}
+                         {form.formState.errors.partsUsed && typeof form.formState.errors.partsUsed === 'string' && (
+                            <p className="text-sm font-medium text-destructive text-center">
+                                {form.formState.errors.partsUsed}
+                            </p>
+                        )}
+                    </>
+                )}
               </div>
 
               <Separator />
@@ -291,12 +300,13 @@ export default function DirectSalesPage() {
                         name="discountAmount"
                         render={({ field }) => (
                             <FormItem className="flex justify-between items-center">
-                            <FormLabel className="text-sm font-medium">Discount:</FormLabel>
+                            <FormLabel className="text-sm font-medium shrink-0 mr-2">Discount:</FormLabel>
                             <div className="relative w-32">
                                 <span className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground">{shopSettings?.currencySymbol || '$'}</span>
                                 <Input 
                                 type="number" step="0.01" placeholder="0.00" {...field} 
                                 className="pl-6 h-8 text-sm" 
+                                value={field.value === undefined || field.value === null ? '' : field.value} // Ensure empty string for undefined
                                 onChange={e => field.onChange(e.target.value === '' ? '' : parseFloat(e.target.value) || 0)} />
                             </div>
                             <FormMessage className="text-xs col-span-full" />
@@ -363,7 +373,7 @@ export default function DirectSalesPage() {
                 <Button type="button" variant="outline" onClick={() => router.push("/dashboard")}>
                   Cancel Sale
                 </Button>
-                <Button type="submit" disabled={form.formState.isSubmitting || grandTotal <= 0 || partFields.length === 0} size="lg">
+                <Button type="submit" disabled={form.formState.isSubmitting || grandTotal < 0 || partFields.length === 0} size="lg">
                   {form.formState.isSubmitting ? "Processing..." : `Complete Sale (${shopSettings?.currencySymbol || '$'}${grandTotal.toFixed(2)})`}
                 </Button>
               </div>
@@ -374,3 +384,4 @@ export default function DirectSalesPage() {
     </div>
   );
 }
+

@@ -4,7 +4,7 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import type { JobOrder, Customer, Motorcycle, JobOrderServiceItem, JobOrderPartItem, Mechanic, Payment } from "@/types";
+import type { JobOrder, Customer, Motorcycle, Mechanic, Payment } from "@/types";
 import { ArrowLeft, ClipboardList, DollarSign, Edit, Printer, Send, UserCog, PackageSearch, Wrench, CreditCard, PlusCircle } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
@@ -24,7 +24,7 @@ if (typeof window !== 'undefined' && !(window as any).__paymentStore) {
         addPayment: (payment: Omit<Payment, 'id' | 'createdAt'>) => {
             const newPayment: Payment = {
                 ...payment,
-                id: String(Date.now()),
+                id: String(Date.now() + Math.random()), // ensure more unique ID
                 createdAt: new Date(),
             };
             (window as any).__paymentStore.payments.push(newPayment);
@@ -32,6 +32,11 @@ if (typeof window !== 'undefined' && !(window as any).__paymentStore) {
         },
         getPaymentsByJobOrderId: (jobOrderId: string) => {
             return (window as any).__paymentStore.payments.filter((p: Payment) => p.jobOrderId === jobOrderId);
+        },
+        // Add deletePaymentById if it's needed for rollbacks or direct management
+        deletePaymentById: (paymentId: string) => {
+            (window as any).__paymentStore.payments = (window as any).__paymentStore.payments.filter((p: Payment) => p.id !== paymentId);
+            return true;
         }
     };
 }
@@ -50,6 +55,7 @@ export default function ViewJobOrderPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isMounted, setIsMounted] = useState(false);
   const [showAddPaymentDialog, setShowAddPaymentDialog] = useState(false);
+  const [shopSettings, setShopSettings] = useState<any>(null); // For currency symbol
 
   const refreshJobOrderData = useCallback(() => {
     if (jobOrderId && isMounted) {
@@ -57,16 +63,18 @@ export default function ViewJobOrderPage() {
         let custData: Customer | undefined;
         let motoData: Motorcycle | undefined;
         let allMechanics: Mechanic[] = [];
+        let currentShopSettings: any = null;
+
 
         if (typeof window !== 'undefined') {
             if ((window as any).__jobOrderStore) {
-            joData = (window as any).__jobOrderStore.getJobOrderById(jobOrderId);
+                joData = (window as any).__jobOrderStore.getJobOrderById(jobOrderId);
             }
-            if (joData && (window as any).__customerStore) {
-            custData = (window as any).__customerStore.getCustomerById(joData.customerId);
+            if (joData && (window as any).__customerStore && joData.customerId) {
+                custData = (window as any).__customerStore.getCustomerById(joData.customerId);
             }
-            if (joData && (window as any).__motorcycleStore) {
-            motoData = (window as any).__motorcycleStore.getMotorcycleById(joData.motorcycleId);
+            if (joData && (window as any).__motorcycleStore && joData.motorcycleId) {
+                motoData = (window as any).__motorcycleStore.getMotorcycleById(joData.motorcycleId);
             }
             if ((window as any).__mechanicStore) {
                 allMechanics = (window as any).__mechanicStore.mechanics;
@@ -74,24 +82,14 @@ export default function ViewJobOrderPage() {
                 allMechanics.forEach(m => map.set(m.id, m.name));
                 setMechanicsMap(map);
             }
+            if ((window as any).__settingsStore) {
+                currentShopSettings = (window as any).__settingsStore.getSettings();
+                setShopSettings(currentShopSettings);
+            }
         }
 
         if (joData) {
-            // Simulate fetching payments from paymentStore and attaching to jobOrder if not already there
-            // In a real app, paymentHistory would likely be part of the joData fetched from backend
-            if ((window as any).__paymentStore && (!joData.paymentHistory || joData.paymentHistory.length === 0)) {
-                 const payments = (window as any).__paymentStore.getPaymentsByJobOrderId(joData.id);
-                 if(payments.length > 0) {
-                    // This is a bit of a hack for the mock store; ideally, jobOrder in __jobOrderStore should be the source of truth.
-                    // For now, we ensure the viewed jobOrder object has the payments.
-                    joData.paymentHistory = payments;
-                    // Recalculate amountPaid and status for display consistency
-                    joData.amountPaid = payments.reduce((sum: number, p: Payment) => sum + p.amount, 0);
-                    if (joData.amountPaid >= joData.grandTotal) joData.paymentStatus = PAYMENT_STATUSES.PAID;
-                    else if (joData.amountPaid > 0) joData.paymentStatus = PAYMENT_STATUSES.PARTIAL;
-                    else joData.paymentStatus = PAYMENT_STATUSES.UNPAID;
-                 }
-            }
+            // The getJobOrderById from __jobOrderStore should now be consistently attaching payments
             setJobOrder(joData);
             setCustomer(custData || null);
             setMotorcycle(motoData || null);
@@ -120,12 +118,14 @@ export default function ViewJobOrderPage() {
   }, [jobOrderId, isMounted, refreshJobOrderData]);
 
   const handlePaymentAdded = () => {
-    refreshJobOrderData(); // Re-fetch/re-process job order data to show new payment
+    refreshJobOrderData(); 
     toast({
         title: "Payment Added",
         description: "The payment has been successfully recorded.",
     });
   };
+  
+  const currency = useMemo(() => shopSettings?.currencySymbol || '$', [shopSettings]);
 
   const DetailItem = ({ label, value, className, isBadge = false, badgeVariant = "secondary" }: { label: string, value?: string | number | Date | null | React.ReactNode, className?: string, isBadge?: boolean, badgeVariant?: "default" | "secondary" | "destructive" | "outline" | null | undefined }) => {
     if (value === undefined || value === null || value === '') return null;
@@ -133,7 +133,7 @@ export default function ViewJobOrderPage() {
     if (value instanceof Date) {
       displayValue = format(value, "PPP p");
     } else if (typeof value === 'number' && (label.toLowerCase().includes('cost') || label.toLowerCase().includes('total') || label.toLowerCase().includes('amount') || label.toLowerCase().includes('balance')) ) {
-      displayValue = `$${value.toFixed(2)}`;
+      displayValue = `${currency}${value.toFixed(2)}`;
     }
 
     if (isBadge && typeof displayValue === 'string') {
@@ -170,7 +170,7 @@ export default function ViewJobOrderPage() {
     return <div className="flex justify-center items-center h-screen"><p>Job order not found.</p></div>;
   }
   
-  const isFullyPaid = jobOrder.paymentStatus === PAYMENT_STATUSES.PAID || balanceDue <= 0;
+  const isFullyPaid = jobOrder.paymentStatus === PAYMENT_STATUSES.PAID || balanceDue <= 0.001; // Use small epsilon for float comparison
 
   return (
     <div className="flex flex-col gap-6">
@@ -188,11 +188,13 @@ export default function ViewJobOrderPage() {
             <Button onClick={() => alert("Email functionality coming soon!")}>
                 <Send className="mr-2 h-4 w-4" /> Email to Customer
             </Button>
-            <Button asChild>
-                <Link href={`/dashboard/job-orders/${jobOrder.id}/edit`}>
-                    <Edit className="mr-2 h-4 w-4" /> Edit Job Order
-                </Link>
-            </Button>
+            {jobOrder.status !== "Sale - Completed" && ( // Do not allow editing of "Sale - Completed"
+                <Button asChild>
+                    <Link href={`/dashboard/job-orders/${jobOrder.id}/edit`}>
+                        <Edit className="mr-2 h-4 w-4" /> Edit Job Order
+                    </Link>
+                </Button>
+            )}
         </div>
       </div>
 
@@ -208,11 +210,12 @@ export default function ViewJobOrderPage() {
             </div>
             <div className="text-right">
                 <p className="text-sm text-muted-foreground">Status</p>
-                <Badge variant={jobOrder.status === "Completed" ? "default" : "secondary"} className="text-lg px-3 py-1">{jobOrder.status}</Badge>
+                <Badge variant={jobOrder.status === "Completed" || jobOrder.status === "Sale - Completed" ? "default" : "secondary"} className="text-lg px-3 py-1">{jobOrder.status}</Badge>
             </div>
           </div>
         </CardHeader>
         <CardContent className="space-y-6">
+        {jobOrder.customerId && customer && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <Card>
               <CardHeader><CardTitle className="text-xl">Customer Details</CardTitle></CardHeader>
@@ -222,92 +225,92 @@ export default function ViewJobOrderPage() {
                 <DetailItem label="Email" value={customer?.email} />
               </CardContent>
             </Card>
-            <Card>
-              <CardHeader><CardTitle className="text-xl">Motorcycle Details</CardTitle></CardHeader>
-              <CardContent>
-                <DetailItem label="Make & Model" value={motorcycle ? `${motorcycle.make} ${motorcycle.model}` : "N/A"} />
-                <DetailItem label="Plate Number" value={motorcycle?.plateNumber} />
-                <DetailItem label="Year" value={motorcycle?.year} />
-                <DetailItem label="Odometer" value={motorcycle ? `${motorcycle.odometer} km/mi` : undefined} />
-              </CardContent>
-            </Card>
+             {jobOrder.motorcycleId && motorcycle && (
+                <Card>
+                <CardHeader><CardTitle className="text-xl">Motorcycle Details</CardTitle></CardHeader>
+                <CardContent>
+                    <DetailItem label="Make & Model" value={motorcycle ? `${motorcycle.make} ${motorcycle.model}` : "N/A"} />
+                    <DetailItem label="Plate Number" value={motorcycle?.plateNumber} />
+                    <DetailItem label="Year" value={motorcycle?.year} />
+                    <DetailItem label="Odometer" value={motorcycle ? `${motorcycle.odometer} km/mi` : undefined} />
+                </CardContent>
+                </Card>
+             )}
           </div>
+        )}
           
           <Separator />
-           <DetailItem label="Diagnostics / Customer Complaint" value={jobOrder.diagnostics} />
+           <DetailItem label="Diagnostics / Customer Complaint / Sale Type" value={jobOrder.diagnostics} />
           <Separator />
 
-          <Card>
-            <CardHeader>
-                <div className="flex items-center gap-2">
-                    <Wrench className="h-5 w-5 text-primary"/>
-                    <CardTitle className="text-xl">Services Performed</CardTitle>
-                </div>
-            </CardHeader>
-            <CardContent>
-              {jobOrder.servicesPerformed && jobOrder.servicesPerformed.length > 0 ? (
+          {jobOrder.servicesPerformed && jobOrder.servicesPerformed.length > 0 && (
+            <Card>
+                <CardHeader>
+                    <div className="flex items-center gap-2">
+                        <Wrench className="h-5 w-5 text-primary"/>
+                        <CardTitle className="text-xl">Services Performed</CardTitle>
+                    </div>
+                </CardHeader>
+                <CardContent>
                 <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Service</TableHead>
-                      <TableHead>Mechanic</TableHead>
-                      <TableHead>Notes</TableHead>
-                      <TableHead className="text-right">Cost</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {jobOrder.servicesPerformed.map((item) => (
-                      <TableRow key={item.id}>
-                        <TableCell>{item.serviceName}</TableCell>
-                        <TableCell>{item.assignedMechanicId ? mechanicsMap.get(item.assignedMechanicId) || 'N/A' : 'N/A'}</TableCell>
-                        <TableCell className="max-w-xs truncate">{item.notes || "-"}</TableCell>
-                        <TableCell className="text-right">${item.laborCost.toFixed(2)}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              ) : (
-                <p className="text-muted-foreground">No specific services listed.</p>
-              )}
-               <DetailItem label="Overall Service Notes" value={jobOrder.servicesDescription} className="mt-4" />
-            </CardContent>
-          </Card>
+                    <TableHeader>
+                        <TableRow>
+                        <TableHead>Service</TableHead>
+                        <TableHead>Mechanic</TableHead>
+                        <TableHead>Notes</TableHead>
+                        <TableHead className="text-right">Cost</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {jobOrder.servicesPerformed.map((item) => (
+                        <TableRow key={item.id}>
+                            <TableCell>{item.serviceName}</TableCell>
+                            <TableCell>{item.assignedMechanicId ? mechanicsMap.get(item.assignedMechanicId) || 'N/A' : 'N/A'}</TableCell>
+                            <TableCell className="max-w-xs truncate">{item.notes || "-"}</TableCell>
+                            <TableCell className="text-right">{currency}{item.laborCost.toFixed(2)}</TableCell>
+                        </TableRow>
+                        ))}
+                    </TableBody>
+                    </Table>
+                <DetailItem label="Overall Service Notes" value={jobOrder.servicesDescription} className="mt-4" />
+                </CardContent>
+            </Card>
+          )}
 
-          <Card>
-             <CardHeader>
-                <div className="flex items-center gap-2">
-                    <PackageSearch className="h-5 w-5 text-primary"/>
-                    <CardTitle className="text-xl">Parts Used</CardTitle>
-                </div>
-            </CardHeader>
-            <CardContent>
-              {jobOrder.partsUsed && jobOrder.partsUsed.length > 0 ? (
+
+          {jobOrder.partsUsed && jobOrder.partsUsed.length > 0 && (
+            <Card>
+                <CardHeader>
+                    <div className="flex items-center gap-2">
+                        <PackageSearch className="h-5 w-5 text-primary"/>
+                        <CardTitle className="text-xl">Parts Used</CardTitle>
+                    </div>
+                </CardHeader>
+                <CardContent>
                 <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Part</TableHead>
-                      <TableHead className="text-center">Qty</TableHead>
-                      <TableHead className="text-right">Price/Unit</TableHead>
-                      <TableHead className="text-right">Total</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {jobOrder.partsUsed.map((item) => (
-                      <TableRow key={item.id}>
-                        <TableCell>{item.partName}</TableCell>
-                        <TableCell className="text-center">{item.quantity}</TableCell>
-                        <TableCell className="text-right">${item.pricePerUnit.toFixed(2)}</TableCell>
-                        <TableCell className="text-right">${item.totalPrice.toFixed(2)}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              ) : (
-                <p className="text-muted-foreground">No specific parts listed.</p>
-              )}
-              <DetailItem label="Overall Parts Notes" value={jobOrder.partsDescription} className="mt-4" />
-            </CardContent>
-          </Card>
+                    <TableHeader>
+                        <TableRow>
+                        <TableHead>Part</TableHead>
+                        <TableHead className="text-center">Qty</TableHead>
+                        <TableHead className="text-right">Price/Unit</TableHead>
+                        <TableHead className="text-right">Total</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {jobOrder.partsUsed.map((item) => (
+                        <TableRow key={item.id}>
+                            <TableCell>{item.partName}</TableCell>
+                            <TableCell className="text-center">{item.quantity}</TableCell>
+                            <TableCell className="text-right">{currency}{item.pricePerUnit.toFixed(2)}</TableCell>
+                            <TableCell className="text-right">{currency}{item.totalPrice.toFixed(2)}</TableCell>
+                        </TableRow>
+                        ))}
+                    </TableBody>
+                    </Table>
+                <DetailItem label="Overall Parts Notes" value={jobOrder.partsDescription} className="mt-4" />
+                </CardContent>
+            </Card>
+          )}
           
           <Separator />
           
@@ -315,23 +318,23 @@ export default function ViewJobOrderPage() {
             <Card>
                 <CardHeader><CardTitle className="text-xl">Financial Summary</CardTitle></CardHeader>
                 <CardContent className="space-y-2">
-                    <DetailItem label="Total Labor Cost" value={totalLaborCost} />
-                    <DetailItem label="Total Parts Cost" value={totalPartsCost} />
+                    {totalLaborCost > 0 && <DetailItem label="Total Labor Cost" value={totalLaborCost} />}
+                    {totalPartsCost > 0 && <DetailItem label="Total Parts Cost" value={totalPartsCost} />}
                     <DetailItem label="Discount Amount" value={jobOrder.discountAmount} />
-                    <DetailItem label="Tax Amount" value={jobOrder.taxAmount} />
+                    {jobOrder.taxAmount !== undefined && jobOrder.taxAmount > 0 && <DetailItem label="Tax Amount" value={jobOrder.taxAmount} />}
                     <Separator className="my-3"/>
                     <div className="flex justify-between items-center mt-2">
                         <p className="text-lg font-semibold">Grand Total:</p>
-                        <p className="text-2xl font-bold text-primary">${jobOrder.grandTotal.toFixed(2)}</p>
+                        <p className="text-2xl font-bold text-primary">{currency}{jobOrder.grandTotal.toFixed(2)}</p>
                     </div>
                      <div className="flex justify-between items-center mt-1">
                         <p className="text-sm font-medium">Amount Paid:</p>
-                        <p className="text-sm font-semibold text-green-500">${jobOrder.amountPaid.toFixed(2)}</p>
+                        <p className="text-sm font-semibold text-green-500">{currency}{jobOrder.amountPaid.toFixed(2)}</p>
                     </div>
                     <div className="flex justify-between items-center mt-1">
                         <p className="text-sm font-medium">Balance Due:</p>
-                        <p className={cn("text-sm font-semibold", balanceDue > 0 ? "text-destructive" : "text-green-500")}>
-                            ${balanceDue.toFixed(2)}
+                        <p className={cn("text-sm font-semibold", balanceDue > 0.001 ? "text-destructive" : "text-green-500")}>
+                            {currency}{balanceDue.toFixed(2)}
                         </p>
                     </div>
                 </CardContent>
@@ -365,6 +368,7 @@ export default function ViewJobOrderPage() {
                                         <TableHead>Date</TableHead>
                                         <TableHead>Method</TableHead>
                                         <TableHead className="text-right">Amount</TableHead>
+                                        <TableHead>Notes</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
@@ -372,7 +376,8 @@ export default function ViewJobOrderPage() {
                                         <TableRow key={payment.id}>
                                             <TableCell>{format(new Date(payment.paymentDate), "MMM dd, yyyy")}</TableCell>
                                             <TableCell>{payment.method}</TableCell>
-                                            <TableCell className="text-right">${payment.amount.toFixed(2)}</TableCell>
+                                            <TableCell className="text-right">{currency}{payment.amount.toFixed(2)}</TableCell>
+                                            <TableCell className="max-w-[150px] truncate">{payment.notes || "-"}</TableCell>
                                         </TableRow>
                                     ))}
                                 </TableBody>
@@ -382,8 +387,11 @@ export default function ViewJobOrderPage() {
                      {(!jobOrder.paymentHistory || jobOrder.paymentHistory.length === 0) && !isFullyPaid && (
                          <p className="text-sm text-muted-foreground mt-4">No payments recorded yet.</p>
                      )}
-                      {isFullyPaid && (!jobOrder.paymentHistory || jobOrder.paymentHistory.length === 0) && jobOrder.amountPaid === jobOrder.grandTotal && (
-                         <p className="text-sm text-green-600 mt-4">Marked as paid (e.g., on creation or zero balance).</p>
+                      {isFullyPaid && (!jobOrder.paymentHistory || jobOrder.paymentHistory.length === 0) && jobOrder.amountPaid === jobOrder.grandTotal && jobOrder.grandTotal > 0 && (
+                         <p className="text-sm text-green-600 mt-4">Marked as paid (e.g., on creation).</p>
+                     )}
+                     {isFullyPaid && jobOrder.grandTotal === 0 && (
+                        <p className="text-sm text-green-600 mt-4">Zero balance order marked as paid.</p>
                      )}
 
 
@@ -402,6 +410,7 @@ export default function ViewJobOrderPage() {
             onOpenChange={setShowAddPaymentDialog}
             jobOrder={jobOrder}
             onPaymentAdded={handlePaymentAdded}
+            currencySymbol={currency}
          />
       )}
     </div>

@@ -34,6 +34,7 @@ interface AddPaymentDialogProps {
   onOpenChange: (isOpen: boolean) => void;
   jobOrder: JobOrder;
   onPaymentAdded: () => void;
+  currencySymbol?: string;
 }
 
 const paymentFormSchema = z.object({
@@ -45,19 +46,32 @@ const paymentFormSchema = z.object({
 
 type PaymentFormValues = z.infer<typeof paymentFormSchema>;
 
-export function AddPaymentDialog({ isOpen, onOpenChange, jobOrder, onPaymentAdded }: AddPaymentDialogProps) {
+export function AddPaymentDialog({ isOpen, onOpenChange, jobOrder, onPaymentAdded, currencySymbol = "$" }: AddPaymentDialogProps) {
   const balanceDue = jobOrder.grandTotal - jobOrder.amountPaid;
 
   const form = useForm<PaymentFormValues>({
     resolver: zodResolver(paymentFormSchema),
     defaultValues: {
-      amount: Math.max(0, balanceDue), // Default to remaining balance, but not less than 0
+      amount: Math.max(0.01, balanceDue), // Default to remaining balance, but not less than 0.01
       paymentDate: new Date(),
       method: "Cash",
       notes: "",
     },
   });
   
+  // Reset form when dialog opens with new job order or balance changes
+  React.useEffect(() => {
+    if (isOpen) {
+        form.reset({
+            amount: parseFloat(Math.max(0.01, balanceDue).toFixed(2)),
+            paymentDate: new Date(),
+            method: "Cash",
+            notes: "",
+        });
+    }
+  }, [isOpen, balanceDue, form]);
+
+
   function onSubmit(data: PaymentFormValues) {
     if (typeof window !== 'undefined' && (window as any).__jobOrderStore && (window as any).__paymentStore) {
         const newPaymentData: Omit<Payment, 'id' | 'createdAt'> = {
@@ -66,18 +80,14 @@ export function AddPaymentDialog({ isOpen, onOpenChange, jobOrder, onPaymentAdde
             paymentDate: data.paymentDate,
             method: data.method,
             notes: data.notes,
-            processedByUserId: "current_user_placeholder", // Replace with actual user ID
+            processedByUserId: "current_user_placeholder", 
         };
         
-        // Add to payment store (if you have a separate one)
         const savedPayment = (window as any).__paymentStore.addPayment(newPaymentData);
-
-        // Update job order in its store
         (window as any).__jobOrderStore.addPaymentToJobOrder(jobOrder.id, savedPayment);
         
         onPaymentAdded();
         onOpenChange(false);
-        form.reset({ amount: 0, paymentDate: new Date(), method: "Cash", notes: "" });
     }
   }
 
@@ -85,14 +95,14 @@ export function AddPaymentDialog({ isOpen, onOpenChange, jobOrder, onPaymentAdde
     <Dialog open={isOpen} onOpenChange={(open) => {
         onOpenChange(open);
         if (!open) {
-            form.reset({ amount: Math.max(0, balanceDue), paymentDate: new Date(), method: "Cash", notes: "" });
+            // form.reset() done in useEffect to ensure correct balanceDue
         }
     }}>
       <DialogContent className="sm:max-w-[480px]">
         <DialogHeader>
           <DialogTitle>Add Payment for Job Order #{jobOrder.id.substring(0,6)}</DialogTitle>
           <DialogDescription>
-            Record a payment made towards this job order. Balance Due: ${balanceDue.toFixed(2)}
+            Balance Due: {currencySymbol}{balanceDue.toFixed(2)}
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
@@ -105,8 +115,8 @@ export function AddPaymentDialog({ isOpen, onOpenChange, jobOrder, onPaymentAdde
                   <FormLabel>Payment Amount</FormLabel>
                   <FormControl>
                     <div className="relative">
-                        <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                        <Input type="number" step="0.01" placeholder="0.00" {...field} className="pl-8" onChange={e => field.onChange(parseFloat(e.target.value) || 0)} />
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground">{currencySymbol}</span>
+                        <Input type="number" step="0.01" placeholder="0.00" {...field} className="pl-7" onChange={e => field.onChange(parseFloat(e.target.value) || 0)} />
                     </div>
                   </FormControl>
                   <FormMessage />
@@ -166,7 +176,6 @@ export function AddPaymentDialog({ isOpen, onOpenChange, jobOrder, onPaymentAdde
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => {
                   onOpenChange(false);
-                  form.reset({ amount: Math.max(0, balanceDue), paymentDate: new Date(), method: "Cash", notes: "" });
                 }}>
                 Cancel
               </Button>
@@ -180,3 +189,4 @@ export function AddPaymentDialog({ isOpen, onOpenChange, jobOrder, onPaymentAdde
     </Dialog>
   );
 }
+

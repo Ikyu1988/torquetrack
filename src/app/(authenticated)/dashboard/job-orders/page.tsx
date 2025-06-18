@@ -25,7 +25,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
-import type { JobOrder, Customer, Motorcycle, Part, Service, Payment } from "@/types";
+import type { JobOrder, Customer, Motorcycle, Part, Service, Payment, PaymentMethod } from "@/types";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { PAYMENT_STATUSES, JOB_ORDER_STATUSES } from "@/lib/constants";
@@ -38,14 +38,15 @@ const initialJobOrders: JobOrder[] = [
     motorcycleId: "m1", // Honda CBR600RR
     status: JOB_ORDER_STATUSES.IN_PROGRESS,
     servicesPerformed: [
-      { id: "jos1", serviceId: "svc1", serviceName: "Oil Change", laborCost: 50 }
+      { id: "jos1", serviceId: "svc1", serviceName: "Oil Change", laborCost: 50, assignedMechanicId: "mech1" }
     ],
     partsUsed: [
       { id: "jop1", partId: "part2", partName: "Oil Filter Hiflo HF204", quantity: 1, pricePerUnit: 12.50, totalPrice: 12.50 }
     ],
     servicesDescription: "Standard oil change, chain lubrication.", 
     partsDescription: "Oil filter, 4L synthetic oil.", 
-    grandTotal: 62.50, 
+    taxAmount: 4.69, // Assuming 7.5% of (50+12.50)
+    grandTotal: 67.19, 
     paymentStatus: PAYMENT_STATUSES.UNPAID,
     amountPaid: 0,
     paymentHistory: [],
@@ -60,18 +61,19 @@ const initialJobOrders: JobOrder[] = [
     motorcycleId: "m2", // Yamaha MT-07
     status: JOB_ORDER_STATUSES.COMPLETED,
     servicesPerformed: [
-      { id: "jos2", serviceId: "svc2", serviceName: "Tire Replacement", laborCost: 150 }
+      { id: "jos2", serviceId: "svc2", serviceName: "Tire Replacement", laborCost: 150, assignedMechanicId: "mech2" }
     ],
     partsUsed: [
       { id: "jop2", partId: "someTirePartId1", partName: "Pirelli Diablo Rosso III (Front)", quantity: 1, pricePerUnit: 175, totalPrice: 175 },
       { id: "jop3", partId: "someTirePartId2", partName: "Pirelli Diablo Rosso III (Rear)", quantity: 1, pricePerUnit: 175, totalPrice: 175 }
     ],
     servicesDescription: "Tire replacement (front and rear), brake fluid flush.",
-    grandTotal: 500, 
+    taxAmount: 37.50, // Assuming 7.5% of (150+175+175)
+    grandTotal: 537.50, 
     paymentStatus: PAYMENT_STATUSES.PAID,
-    amountPaid: 500,
+    amountPaid: 537.50,
     paymentHistory: [
-        { id: "pay1", jobOrderId: "jo2", amount: 500, paymentDate: new Date(2023, 11, 3), method: "Credit Card", processedByUserId: "user456", createdAt: new Date(2023, 11, 3) }
+        { id: "pay1", jobOrderId: "jo2", amount: 537.50, paymentDate: new Date(2023, 11, 3), method: "Credit Card", processedByUserId: "user456", createdAt: new Date(2023, 11, 3), notes: "Paid in full via CC" }
     ],
     createdAt: new Date(2023, 11, 1),
     updatedAt: new Date(2023, 11, 3),
@@ -80,44 +82,51 @@ const initialJobOrders: JobOrder[] = [
   },
 ];
 
+type AddJobOrderInput = Omit<JobOrder, 'id' | 'createdAt' | 'updatedAt' | 'createdByUserId' | 'grandTotal' | 'amountPaid' | 'paymentHistory'> & {
+  initialPaymentMethod?: PaymentMethod;
+  initialPaymentNotes?: string;
+};
+
+
 // In-memory store for job orders
 if (typeof window !== 'undefined') {
   if (!(window as any).__jobOrderStore) {
     (window as any).__jobOrderStore = {
       jobOrders: [...initialJobOrders],
-      addJobOrder: (jobOrderData: Omit<JobOrder, 'id' | 'createdAt' | 'updatedAt' | 'createdByUserId' | 'grandTotal' | 'amountPaid' | 'paymentHistory'> & {grandTotal?: number}) => {
+      addJobOrder: (jobOrderData: AddJobOrderInput) => {
         const totalLabor = jobOrderData.servicesPerformed.reduce((sum, s) => sum + s.laborCost, 0);
         const totalParts = jobOrderData.partsUsed.reduce((sum, p) => sum + p.totalPrice, 0);
         const discount = Number(jobOrderData.discountAmount) || 0;
         
-        let taxRate = 0;
+        let taxRateValue = 0;
         if(typeof window !== 'undefined' && (window as any).__settingsStore) {
-            taxRate = (window as any).__settingsStore.getSettings()?.defaultTaxRate || 0;
+            taxRateValue = (window as any).__settingsStore.getSettings()?.defaultTaxRate || 0;
         }
-        const subTotal = totalLabor + totalParts - discount;
-        const taxAmount = jobOrderData.taxAmount === undefined ? (subTotal * (taxRate / 100)) : Number(jobOrderData.taxAmount);
-
+        const subTotalBeforeTax = totalLabor + totalParts - discount;
+        const calculatedTaxAmount = jobOrderData.taxAmount === undefined ? (subTotalBeforeTax * (taxRateValue / 100)) : Number(jobOrderData.taxAmount);
 
         const newJobOrder: JobOrder = {
           ...jobOrderData,
           id: String(Date.now()), // Simple ID generation
           servicesPerformed: jobOrderData.servicesPerformed || [],
           partsUsed: jobOrderData.partsUsed || [],
-          grandTotal: subTotal + taxAmount,
-          amountPaid: jobOrderData.paymentStatus === PAYMENT_STATUSES.PAID ? (subTotal + taxAmount) : 0, // If marked as paid initially
+          taxAmount: calculatedTaxAmount,
+          grandTotal: subTotalBeforeTax + calculatedTaxAmount,
+          amountPaid: jobOrderData.paymentStatus === PAYMENT_STATUSES.PAID ? (subTotalBeforeTax + calculatedTaxAmount) : 0,
           paymentHistory: [],
           createdAt: new Date(),
           updatedAt: new Date(),
-          createdByUserId: "current_user_placeholder", // Replace with actual user ID
+          createdByUserId: "current_user_placeholder", 
         };
 
         if (newJobOrder.paymentStatus === PAYMENT_STATUSES.PAID && newJobOrder.amountPaid > 0 && newJobOrder.paymentHistory.length === 0) {
             const initialPayment: Payment = {
-                id: String(Date.now() + 1), // ensure unique id
+                id: String(Date.now() + 1), 
                 jobOrderId: newJobOrder.id,
                 amount: newJobOrder.amountPaid,
                 paymentDate: new Date(),
-                method: 'Cash', // Default or could be part of form
+                method: jobOrderData.initialPaymentMethod || 'Cash', 
+                notes: jobOrderData.initialPaymentNotes || `Initial payment for order #${newJobOrder.id.substring(0,6)}`,
                 processedByUserId: newJobOrder.createdByUserId,
                 createdAt: new Date(),
             };
@@ -127,7 +136,6 @@ if (typeof window !== 'undefined') {
             }
         }
 
-
         (window as any).__jobOrderStore.jobOrders.push(newJobOrder);
 
         // Deduct inventory
@@ -136,7 +144,6 @@ if (typeof window !== 'undefined') {
             const partIndex = (window as any).__inventoryStore.parts.findIndex((p: Part) => p.id === item.partId);
             if (partIndex !== -1) {
               (window as any).__inventoryStore.parts[partIndex].stockQuantity -= item.quantity;
-              // TODO: Add a check here if stockQuantity < 0 and handle (e.g., toast warning)
               if ((window as any).__inventoryStore.parts[partIndex].stockQuantity < 0) {
                 console.warn(`Stock for part ${item.partName} (${item.partId}) is now negative: ${(window as any).__inventoryStore.parts[partIndex].stockQuantity}`);
               }
@@ -150,27 +157,25 @@ if (typeof window !== 'undefined') {
         if (index !== -1) {
           const oldJobOrder = (window as any).__jobOrderStore.jobOrders[index];
           
-          // Recalculate grandTotal
           const totalLabor = updatedJobOrder.servicesPerformed.reduce((sum, s) => sum + s.laborCost, 0);
           const totalParts = updatedJobOrder.partsUsed.reduce((sum, p) => sum + p.totalPrice, 0);
           const discount = Number(updatedJobOrder.discountAmount) || 0;
           
-          let taxRate = 0;
+          let taxRateValue = 0;
           if(typeof window !== 'undefined' && (window as any).__settingsStore) {
-              taxRate = (window as any).__settingsStore.getSettings()?.defaultTaxRate || 0;
+              taxRateValue = (window as any).__settingsStore.getSettings()?.defaultTaxRate || 0;
           }
-          const subTotal = totalLabor + totalParts - discount;
-          const taxAmount = updatedJobOrder.taxAmount === undefined ? (subTotal * (taxRate / 100)) : Number(updatedJobOrder.taxAmount);
+          const subTotalBeforeTax = totalLabor + totalParts - discount;
+          const calculatedTaxAmount = updatedJobOrder.taxAmount === undefined ? (subTotalBeforeTax * (taxRateValue / 100)) : Number(updatedJobOrder.taxAmount);
 
           (window as any).__jobOrderStore.jobOrders[index] = {
              ...updatedJobOrder,
-             grandTotal: subTotal + taxAmount,
+             taxAmount: calculatedTaxAmount,
+             grandTotal: subTotalBeforeTax + calculatedTaxAmount,
              updatedAt: new Date() 
             };
           
-          // Adjust inventory: Return old parts, deduct new parts
           if ((window as any).__inventoryStore) {
-            // Return quantities of parts that were on the old job order
             oldJobOrder.partsUsed.forEach(oldItem => {
               const partIndex = (window as any).__inventoryStore.parts.findIndex((p: Part) => p.id === oldItem.partId);
               if (partIndex !== -1) {
@@ -178,7 +183,6 @@ if (typeof window !== 'undefined') {
               }
             });
 
-            // Deduct quantities of parts on the updated job order
             updatedJobOrder.partsUsed.forEach(newItem => {
                 const partIndex = (window as any).__inventoryStore.parts.findIndex((p: Part) => p.id === newItem.partId);
                 if(partIndex !== -1) {
@@ -197,7 +201,6 @@ if (typeof window !== 'undefined') {
          const jobOrderIndex = (window as any).__jobOrderStore.jobOrders.findIndex((jo: JobOrder) => jo.id === jobOrderId);
         if (jobOrderIndex !== -1) {
             const jobOrderToDelete = (window as any).__jobOrderStore.jobOrders[jobOrderIndex];
-            // Return parts to inventory
             if ((window as any).__inventoryStore && jobOrderToDelete.partsUsed) {
                 jobOrderToDelete.partsUsed.forEach(item => {
                     const partIndex = (window as any).__inventoryStore.parts.findIndex((p: Part) => p.id === item.partId);
@@ -212,15 +215,31 @@ if (typeof window !== 'undefined') {
         return false;
       },
       getJobOrderById: (jobOrderId: string) => {
-        return (window as any).__jobOrderStore.jobOrders.find((jo: JobOrder) => jo.id === jobOrderId);
+        const jobOrder = (window as any).__jobOrderStore.jobOrders.find((jo: JobOrder) => jo.id === jobOrderId);
+        // Ensure payment history is attached if payments exist in paymentStore
+        if (jobOrder && (window as any).__paymentStore) {
+            const payments = (window as any).__paymentStore.getPaymentsByJobOrderId(jobOrder.id);
+            jobOrder.paymentHistory = payments;
+            jobOrder.amountPaid = payments.reduce((sum: number, p: Payment) => sum + p.amount, 0);
+            if (jobOrder.amountPaid >= jobOrder.grandTotal) jobOrder.paymentStatus = PAYMENT_STATUSES.PAID;
+            else if (jobOrder.amountPaid > 0) jobOrder.paymentStatus = PAYMENT_STATUSES.PARTIAL;
+            else jobOrder.paymentStatus = PAYMENT_STATUSES.UNPAID;
+        }
+        return jobOrder;
       },
       addPaymentToJobOrder: (jobOrderId: string, payment: Payment) => {
         const joIndex = (window as any).__jobOrderStore.jobOrders.findIndex((jo: JobOrder) => jo.id === jobOrderId);
         if (joIndex !== -1) {
           const jobOrder = (window as any).__jobOrderStore.jobOrders[joIndex];
-          jobOrder.paymentHistory.push(payment);
-          jobOrder.amountPaid += payment.amount;
-          // Ensure grandTotal is a number
+          // Check if this exact payment ID already exists to prevent duplicates if this function is somehow called twice with the same payment object
+          if (!jobOrder.paymentHistory.find(p => p.id === payment.id)) {
+            jobOrder.paymentHistory.push(payment);
+            jobOrder.amountPaid += payment.amount;
+          } else {
+            // If payment already exists, ensure amountPaid is correct (e.g. after page refresh and re-fetching)
+            jobOrder.amountPaid = jobOrder.paymentHistory.reduce((sum: number, p: Payment) => sum + p.amount, 0);
+          }
+          
           const grandTotalNum = Number(jobOrder.grandTotal) || 0;
           if (jobOrder.amountPaid >= grandTotalNum) {
             jobOrder.paymentStatus = PAYMENT_STATUSES.PAID;
@@ -252,7 +271,19 @@ export default function JobOrdersPage() {
     setIsMounted(true);
     if (typeof window !== 'undefined') {
       if ((window as any).__jobOrderStore) {
-        setJobOrders([...(window as any).__jobOrderStore.jobOrders]);
+        // Ensure each job order has its payment data refreshed from __paymentStore when listed
+        const ordersFromStore = (window as any).__jobOrderStore.jobOrders.map((jo: JobOrder) => {
+            if ((window as any).__paymentStore) {
+                const payments = (window as any).__paymentStore.getPaymentsByJobOrderId(jo.id);
+                const amountPaid = payments.reduce((sum: number, p: Payment) => sum + p.amount, 0);
+                let paymentStatus = PAYMENT_STATUSES.UNPAID;
+                if (amountPaid >= jo.grandTotal) paymentStatus = PAYMENT_STATUSES.PAID;
+                else if (amountPaid > 0) paymentStatus = PAYMENT_STATUSES.PARTIAL;
+                return {...jo, paymentHistory: payments, amountPaid, paymentStatus};
+            }
+            return jo;
+        });
+        setJobOrders([...ordersFromStore]);
       }
       if ((window as any).__customerStore) { 
         setCustomers([...(window as any).__customerStore.customers]);
@@ -272,15 +303,26 @@ export default function JobOrdersPage() {
   const motorcycleMap = useMemo(() => {
     const map = new Map<string, string>();
     motorcycles.forEach(m => {
-        const customerName = m.customerId ? customerMap.get(m.customerId) || 'Unknown Owner' : 'Unknown Owner';
         map.set(m.id, `${m.make} ${m.model} (${m.plateNumber || 'N/A'})`);
     });
     return map;
-  }, [motorcycles, customerMap]);
+  }, [motorcycles]);
 
   const refreshJobOrders = () => {
     if (typeof window !== 'undefined' && (window as any).__jobOrderStore) {
-      setJobOrders([...(window as any).__jobOrderStore.jobOrders]);
+      const ordersFromStore = (window as any).__jobOrderStore.jobOrders.map((jo: JobOrder) => {
+            if ((window as any).__paymentStore) {
+                const payments = (window as any).__paymentStore.getPaymentsByJobOrderId(jo.id);
+                const amountPaid = payments.reduce((sum: number, p: Payment) => sum + p.amount, 0);
+                let paymentStatus = PAYMENT_STATUSES.UNPAID;
+                if (amountPaid >= jo.grandTotal && jo.grandTotal > 0) paymentStatus = PAYMENT_STATUSES.PAID;
+                else if (amountPaid > 0) paymentStatus = PAYMENT_STATUSES.PARTIAL;
+                else if (jo.grandTotal === 0 && amountPaid === 0) paymentStatus = PAYMENT_STATUSES.PAID; // Consider $0 orders paid
+                return {...jo, paymentHistory: payments, amountPaid, paymentStatus};
+            }
+            return jo;
+        });
+      setJobOrders([...ordersFromStore]);
     }
   };
 
@@ -288,9 +330,9 @@ export default function JobOrdersPage() {
     if (!isMounted) return;
     const interval = setInterval(() => {
       if (typeof window !== 'undefined' && (window as any).__jobOrderStore) {
-        const storeJobOrders = (window as any).__jobOrderStore.jobOrders;
-        // A more robust check might be needed if nested objects change without changing array length/order
-        if (JSON.stringify(storeJobOrders) !== JSON.stringify(jobOrders)) {
+        const storeJobOrdersRaw = (window as any).__jobOrderStore.jobOrders;
+         // Deep comparison or a version flag would be better, but for now, stringify is a simple check
+        if (JSON.stringify(storeJobOrdersRaw.map((jo:JobOrder) => ({id: jo.id, updatedAt: jo.updatedAt, amountPaid: jo.amountPaid}))) !== JSON.stringify(jobOrders.map(jo => ({id: jo.id, updatedAt: jo.updatedAt, amountPaid: jo.amountPaid})))) {
           refreshJobOrders();
         }
       }
@@ -307,6 +349,10 @@ export default function JobOrdersPage() {
     if (jobOrderToDelete) {
       if (typeof window !== 'undefined' && (window as any).__jobOrderStore) {
         (window as any).__jobOrderStore.deleteJobOrder(jobOrderToDelete.id);
+        // Also delete associated payments from __paymentStore
+        if ((window as any).__paymentStore && jobOrderToDelete.paymentHistory) {
+            jobOrderToDelete.paymentHistory.forEach(p => (window as any).__paymentStore.deletePaymentById?.(p.id));
+        }
         refreshJobOrders();
         toast({
           title: "Job Order Deleted",
@@ -409,7 +455,7 @@ export default function JobOrdersPage() {
             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
             <AlertDialogDescription>
               This action cannot be undone. This will permanently delete Order/Sale #{jobOrderToDelete?.id.substring(0,6)}.
-              If this is a direct sale or a job order with parts, stock levels for those parts will be readjusted.
+              If this is a direct sale or a job order with parts, stock levels for those parts will be readjusted. Associated payment records will also be removed.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -423,3 +469,4 @@ export default function JobOrdersPage() {
     </div>
   );
 }
+
