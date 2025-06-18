@@ -1,85 +1,326 @@
 
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { FileText, DollarSign, BarChart2, Package, Users, UserCog, CalendarDays, Download } from "lucide-react";
+import { FileText, DollarSign, BarChart2, Package, Users, UserCog, CalendarDays, Download, Filter, Search } from "lucide-react";
 import { DatePicker } from "@/components/ui/date-picker";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
+import type { JobOrder, Customer, Mechanic, Part, Service, Payment, ShopSettings, JobOrderServiceItem, CommissionType } from "@/types";
+import { JOB_ORDER_STATUS_OPTIONS, JOB_ORDER_STATUSES, COMMISSION_TYPES } from "@/lib/constants";
+import { format } from "date-fns";
 
-// Placeholder data - in a real app, this would come from API calls based on selected dates
-const placeholderSalesData = {
-  totalRevenue: 12500.75,
-  jobOrdersCount: 42,
-  averageJobValue: 297.64,
+// Helper to convert array of objects to CSV string
+const convertToCSV = (data: any[], headers?: string[]): string => {
+  if (data.length === 0) return "";
+  const array = [Object.keys(data[0]), ...data.map(item => Object.values(item))];
+  if (headers) {
+    array[0] = headers;
+  }
+  return array.map(row => 
+    row.map((value: any) => {
+      if (value === null || value === undefined) return '';
+      let str = String(value);
+      if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+        str = `"${str.replace(/"/g, '""')}"`;
+      }
+      return str;
+    }).join(',')
+  ).join('\n');
 };
 
-const placeholderTopServices = [
-  { id: "svc1", name: "Oil Change", count: 25, revenue: 1250 },
-  { id: "svc2", name: "Tire Replacement", count: 10, revenue: 1500 },
-  { id: "svc4", name: "Brake Inspection", count: 18, revenue: 900 },
-];
-
-const placeholderInventoryData = {
-  lowStockItems: 5,
-  totalValue: 18500.00,
-  topMovingItems: [
-    { id: "part2", name: "Oil Filter Hiflo HF204", sold: 30 },
-    { id: "part1", name: "Spark Plug NGK-CR8E", sold: 22 },
-  ],
+const downloadCSV = (csvString: string, filename: string) => {
+  const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+  const link = document.createElement("a");
+  const url = URL.createObjectURL(blob);
+  link.setAttribute("href", url);
+  link.setAttribute("download", filename);
+  link.style.visibility = 'hidden';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
 };
 
-const placeholderMechanicActivity = [
-  { id: "mech1", name: "Alex Miller", jobsCompleted: 15, totalLabor: 1875 },
-  { id: "mech2", name: "Bob Garcia", jobsCompleted: 12, totalLabor: 1500 },
-];
 
 export default function ReportsPage() {
   const { toast } = useToast();
+  const [isMounted, setIsMounted] = useState(false);
+
+  // Global Filters
   const [startDate, setStartDate] = useState<Date | undefined>(new Date(new Date().getFullYear(), new Date().getMonth(), 1));
   const [endDate, setEndDate] = useState<Date | undefined>(new Date());
-  const [isMounted, setIsMounted] = useState(false);
-  const [loadingReport, setLoadingReport] = useState(false);
+  const [selectedStatus, setSelectedStatus] = useState<JobOrderStatus | "ALL">("ALL");
+  const [selectedMechanicId, setSelectedMechanicId] = useState<string | "ALL">("ALL");
+  
+  // Data States
+  const [allJobOrders, setAllJobOrders] = useState<JobOrder[]>([]);
+  const [allMechanics, setAllMechanics] = useState<Mechanic[]>([]);
+  const [allCustomers, setAllCustomers] = useState<Customer[]>([]);
+  const [allServices, setAllServices] = useState<Service[]>([]);
+  const [allParts, setAllParts] = useState<Part[]>([]);
+  const [allPayments, setAllPayments] = useState<Payment[]>([]);
+  const [shopSettings, setShopSettings] = useState<ShopSettings | null>(null);
+
+  // Report Specific States
+  const [jobOrderSummary, setJobOrderSummary] = useState<any[]>([]);
+  const [commissionReport, setCommissionReport] = useState<any[]>([]);
+  const [partsUsageReport, setPartsUsageReport] = useState<any[]>([]);
+  const [serviceSalesReport, setServiceSalesReport] = useState<any[]>([]);
+  const [inventoryValuation, setInventoryValuation] = useState<{ totalValue: number, valuationDetails: any[] }>({ totalValue: 0, valuationDetails: [] });
+  const [incomeSummary, setIncomeSummary] = useState<{ totalIncome: number }>({ totalIncome: 0 });
+  const [customerServiceHistory, setCustomerServiceHistory] = useState<any[]>([]);
+  const [selectedCustomerIdForHistory, setSelectedCustomerIdForHistory] = useState<string | "ALL">("ALL");
+
+  const [loading, setLoading] = useState<Record<string, boolean>>({});
+
+  const currencySymbol = useMemo(() => shopSettings?.currencySymbol || '$', [shopSettings]);
 
   useEffect(() => {
     setIsMounted(true);
+    if (typeof window !== 'undefined') {
+      if ((window as any).__jobOrderStore) setAllJobOrders((window as any).__jobOrderStore.jobOrders || []);
+      if ((window as any).__mechanicStore) setAllMechanics((window as any).__mechanicStore.mechanics || []);
+      if ((window as any).__customerStore) setAllCustomers((window as any).__customerStore.customers || []);
+      if ((window as any).__serviceStore) setAllServices((window as any).__serviceStore.services || []);
+      if ((window as any).__inventoryStore) setAllParts((window as any).__inventoryStore.parts || []);
+      if ((window as any).__paymentStore) setAllPayments((window as any).__paymentStore.payments || []);
+      if ((window as any).__settingsStore) setShopSettings((window as any).__settingsStore.getSettings() || null);
+    }
   }, []);
+  
+  const customerMap = useMemo(() => {
+    const map = new Map<string, string>();
+    allCustomers.forEach(c => map.set(c.id, `${c.firstName} ${c.lastName}`));
+    return map;
+  }, [allCustomers]);
 
-  const handleGenerateReport = () => {
+  const mechanicMap = useMemo(() => {
+    const map = new Map<string, string>();
+    allMechanics.forEach(m => map.set(m.id, m.name));
+    return map;
+  }, [allMechanics]);
+
+  const handleGenerateReport = (reportType: string) => {
     if (!startDate || !endDate) {
-      toast({
-        title: "Select Dates",
-        description: "Please select both a start and end date.",
-        variant: "destructive",
-      });
+      toast({ title: "Select Dates", description: "Please select both start and end dates.", variant: "destructive" });
       return;
     }
     if (endDate < startDate) {
-      toast({
-        title: "Invalid Date Range",
-        description: "End date cannot be earlier than start date.",
-        variant: "destructive",
-      });
+      toast({ title: "Invalid Date Range", description: "End date cannot be earlier than start date.", variant: "destructive" });
       return;
     }
 
-    setLoadingReport(true);
-    // Simulate API call
+    setLoading(prev => ({ ...prev, [reportType]: true }));
+
+    // Simulate API call & processing
     setTimeout(() => {
-      toast({
-        title: "Report Generated (Simulated)",
-        description: `Report for ${startDate.toLocaleDateString()} to ${endDate.toLocaleDateString()} would be displayed.`,
-      });
-      setLoadingReport(false);
-    }, 1500);
+      try {
+        const filteredJobOrders = allJobOrders.filter(jo => {
+          const joDate = new Date(jo.createdAt);
+          const inDateRange = joDate >= startDate && joDate <= endDate;
+          const statusMatch = selectedStatus === "ALL" || jo.status === selectedStatus;
+          
+          // Mechanic filter applies if any service has the selected mechanic or if ALL mechanics are selected
+          const mechanicMatch = selectedMechanicId === "ALL" || 
+                                (jo.servicesPerformed && jo.servicesPerformed.some(s => s.assignedMechanicId === selectedMechanicId));
+          
+          return inDateRange && statusMatch && mechanicMatch;
+        });
+
+        switch (reportType) {
+          case "jobOrderSummary":
+            const summary = filteredJobOrders.map(jo => ({
+              ID: jo.id.substring(0,6),
+              Customer: jo.customerId ? customerMap.get(jo.customerId) || "N/A" : "Walk-in",
+              Motorcycle: jo.motorcycleId && (window as any).__motorcycleStore?.getMotorcycleById(jo.motorcycleId)?.model || "N/A",
+              Mechanic: jo.servicesPerformed?.map(s => s.assignedMechanicId ? mechanicMap.get(s.assignedMechanicId) : '').filter(Boolean).join(', ') || 'N/A',
+              Status: jo.status,
+              Date: format(new Date(jo.createdAt), "yyyy-MM-dd"),
+              Total: `${currencySymbol}${jo.grandTotal.toFixed(2)}`,
+            }));
+            setJobOrderSummary(summary);
+            break;
+          
+          case "commissionReport":
+            let commissions: any[] = [];
+            allJobOrders.filter(jo => { // Filter by date first
+                const joDate = new Date(jo.createdAt);
+                return joDate >= startDate && joDate <= endDate;
+            }).forEach(jo => {
+              jo.servicesPerformed?.forEach(serviceItem => {
+                if (selectedMechanicId !== "ALL" && serviceItem.assignedMechanicId !== selectedMechanicId) return;
+
+                const serviceDetails = allServices.find(s => s.id === serviceItem.serviceId);
+                const mechanicName = serviceItem.assignedMechanicId ? mechanicMap.get(serviceItem.assignedMechanicId) : "N/A";
+                
+                if (serviceDetails && serviceDetails.commissionType && serviceDetails.commissionValue !== undefined) {
+                  let commissionAmount = 0;
+                  if (serviceDetails.commissionType === COMMISSION_TYPES.FIXED) {
+                    commissionAmount = serviceDetails.commissionValue;
+                  } else if (serviceDetails.commissionType === COMMISSION_TYPES.PERCENTAGE) {
+                    commissionAmount = (serviceItem.laborCost * serviceDetails.commissionValue) / 100;
+                  }
+                  commissions.push({
+                    Mechanic: mechanicName,
+                    JobOrderID: jo.id.substring(0,6),
+                    Service: serviceItem.serviceName,
+                    LaborCost: `${currencySymbol}${serviceItem.laborCost.toFixed(2)}`,
+                    CommissionRate: `${serviceDetails.commissionValue}${serviceDetails.commissionType === COMMISSION_TYPES.PERCENTAGE ? '%' : currencySymbol}`,
+                    CommissionEarned: `${currencySymbol}${commissionAmount.toFixed(2)}`,
+                  });
+                }
+              });
+            });
+            setCommissionReport(commissions);
+            break;
+
+          case "partsUsage":
+            const partsUsage: Record<string, { name: string, sku?: string, quantity: number, totalValue: number }> = {};
+            filteredJobOrders.forEach(jo => {
+                jo.partsUsed?.forEach(partItem => {
+                    const partDetails = allParts.find(p => p.id === partItem.partId);
+                    if (!partsUsage[partItem.partId]) {
+                        partsUsage[partItem.partId] = { name: partItem.partName, sku: partDetails?.sku, quantity: 0, totalValue: 0 };
+                    }
+                    partsUsage[partItem.partId].quantity += partItem.quantity;
+                    partsUsage[partItem.partId].totalValue += partItem.totalPrice;
+                });
+            });
+            setPartsUsageReport(Object.values(partsUsage).map(p => ({ ...p, totalValue: `${currencySymbol}${p.totalValue.toFixed(2)}` })));
+            break;
+
+          case "serviceSales":
+            const serviceSales: Record<string, { name: string, count: number, totalRevenue: number }> = {};
+            filteredJobOrders.forEach(jo => {
+                jo.servicesPerformed?.forEach(serviceItem => {
+                    if (!serviceSales[serviceItem.serviceId]) {
+                        serviceSales[serviceItem.serviceId] = { name: serviceItem.serviceName, count: 0, totalRevenue: 0 };
+                    }
+                    serviceSales[serviceItem.serviceId].count++;
+                    serviceSales[serviceItem.serviceId].totalRevenue += serviceItem.laborCost;
+                });
+            });
+            setServiceSalesReport(Object.values(serviceSales).map(s => ({ ...s, totalRevenue: `${currencySymbol}${s.totalRevenue.toFixed(2)}` })));
+            break;
+          
+          case "inventoryValuation":
+            let totalVal = 0;
+            const valuationDetails = allParts.map(part => {
+                const value = part.stockQuantity * (part.cost ?? part.price); // Use cost if available, else price
+                totalVal += value;
+                return {
+                    PartName: part.name,
+                    SKU: part.sku || '-',
+                    Stock: part.stockQuantity,
+                    UnitValue: `${currencySymbol}${(part.cost ?? part.price).toFixed(2)}`,
+                    LineValue: `${currencySymbol}${value.toFixed(2)}`,
+                };
+            });
+            setInventoryValuation({ totalValue: totalVal, valuationDetails });
+            break;
+
+          case "incomeSummary":
+            const currentIncome = allPayments
+              .filter(p => {
+                const paymentDate = new Date(p.paymentDate);
+                return paymentDate >= startDate && paymentDate <= endDate;
+              })
+              .reduce((sum, p) => sum + p.amount, 0);
+            setIncomeSummary({ totalIncome: currentIncome });
+            break;
+            
+          case "customerServiceHistory":
+            if (selectedCustomerIdForHistory === "ALL") {
+                 toast({ title: "Select Customer", description: "Please select a customer to view history.", variant: "destructive" });
+                 setCustomerServiceHistory([]);
+                 break;
+            }
+            const history = allJobOrders
+                .filter(jo => jo.customerId === selectedCustomerIdForHistory)
+                .map(jo => ({
+                    JobOrderID: jo.id.substring(0,6),
+                    Date: format(new Date(jo.createdAt), "yyyy-MM-dd"),
+                    Motorcycle: jo.motorcycleId && (window as any).__motorcycleStore?.getMotorcycleById(jo.motorcycleId)?.model || "N/A",
+                    Services: jo.servicesPerformed?.map(s => s.serviceName).join(', ') || jo.diagnostics || "Parts Sale",
+                    Total: `${currencySymbol}${jo.grandTotal.toFixed(2)}`,
+                }));
+            setCustomerServiceHistory(history);
+            break;
+        }
+        toast({ title: "Report Generated", description: `Data for ${reportType.replace(/([A-Z])/g, ' $1')} has been updated.` });
+      } catch (error) {
+        console.error("Error generating report:", error);
+        toast({ title: "Error", description: `Failed to generate ${reportType} report.`, variant: "destructive" });
+      } finally {
+        setLoading(prev => ({ ...prev, [reportType]: false }));
+      }
+    }, 1000);
+  };
+
+  const handleExportCSV = (reportData: any[], reportName: string, headers?: string[]) => {
+    if (reportData.length === 0) {
+      toast({ title: "No Data", description: `There is no data to export for ${reportName}.`, variant: "destructive" });
+      return;
+    }
+    const csvString = convertToCSV(reportData, headers);
+    downloadCSV(csvString, `${reportName.toLowerCase().replace(/\s+/g, '_')}_export.csv`);
+    toast({ title: "Export Successful", description: `${reportName} data exported to CSV.` });
   };
   
   if (!isMounted) {
     return <div className="flex justify-center items-center h-screen"><p>Loading reports...</p></div>;
   }
+
+  const ReportCard: React.FC<{ title: string; description: string; reportKey: string; data: any[]; columns: { key: string; label: string }[]; children?: React.ReactNode; customFilters?: React.ReactNode; onExport?: () => void; }> = 
+    ({ title, description, reportKey, data, columns, children, customFilters, onExport }) => (
+    <Card className="shadow-md">
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <BarChart2 className="h-5 w-5 text-primary" />
+            <CardTitle className="text-xl">{title}</CardTitle>
+          </div>
+          {onExport && (
+            <Button variant="outline" size="sm" onClick={onExport} disabled={data.length === 0}>
+                <Download className="h-4 w-4 mr-2"/> Export CSV
+            </Button>
+          )}
+        </div>
+        <CardDescription>{description}</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {customFilters}
+        <Button onClick={() => handleGenerateReport(reportKey)} disabled={loading[reportKey]} className="w-full sm:w-auto">
+          {loading[reportKey] ? "Generating..." : "Generate / Refresh Report"}
+        </Button>
+        {children}
+        {data.length > 0 ? (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                {columns.map(col => <TableHead key={col.key}>{col.label}</TableHead>)}
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {data.map((row, rowIndex) => (
+                <TableRow key={rowIndex}>
+                  {columns.map(col => <TableCell key={`${rowIndex}-${col.key}`}>{row[col.key]}</TableCell>)}
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        ) : (
+          <p className="text-muted-foreground text-center py-4">No data to display for this report. Generate the report or adjust filters.</p>
+        )}
+      </CardContent>
+    </Card>
+  );
+
 
   return (
     <div className="flex flex-col gap-8">
@@ -89,165 +330,131 @@ export default function ReportsPage() {
             <FileText className="h-7 w-7 text-primary" />
             <CardTitle className="font-headline text-3xl">Reports Dashboard</CardTitle>
           </div>
-          <CardDescription>Analyze your workshop's performance and gain valuable insights.</CardDescription>
+          <CardDescription>Analyze your workshop's performance and gain valuable insights. Use global filters below for applicable reports.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          <div className="flex flex-col sm:flex-row gap-4 items-end p-4 border rounded-lg bg-muted/30">
-            <div className="grid gap-2 flex-1">
-              <label htmlFor="startDate" className="text-sm font-medium">Start Date</label>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 p-4 border rounded-lg bg-muted/30 items-end">
+            <div className="grid gap-1.5">
+              <label className="text-sm font-medium">Start Date</label>
               <DatePicker value={startDate} onChange={setStartDate} placeholder="Select start date" />
             </div>
-            <div className="grid gap-2 flex-1">
-              <label htmlFor="endDate" className="text-sm font-medium">End Date</label>
+            <div className="grid gap-1.5">
+              <label className="text-sm font-medium">End Date</label>
               <DatePicker value={endDate} onChange={setEndDate} placeholder="Select end date" />
             </div>
-            <Button onClick={handleGenerateReport} disabled={loadingReport} className="w-full sm:w-auto">
-              {loadingReport ? "Generating..." : "Generate Report"}
-            </Button>
+            <div className="grid gap-1.5">
+              <label className="text-sm font-medium">Job Order Status</label>
+              <Select value={selectedStatus} onValueChange={(value) => setSelectedStatus(value as JobOrderStatus | "ALL")}>
+                <SelectTrigger><SelectValue placeholder="Filter by status" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">All Statuses</SelectItem>
+                  {JOB_ORDER_STATUS_OPTIONS.map(status => <SelectItem key={status} value={status}>{status}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-1.5">
+              <label className="text-sm font-medium">Mechanic</label>
+              <Select value={selectedMechanicId} onValueChange={setSelectedMechanicId}>
+                <SelectTrigger><SelectValue placeholder="Filter by mechanic" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">All Mechanics</SelectItem>
+                  {allMechanics.map(mech => <SelectItem key={mech.id} value={mech.id}>{mech.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </CardContent>
       </Card>
 
-      <div className="grid md:grid-cols-2 gap-6">
-        {/* Sales Overview Card */}
-        <Card className="shadow-md">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <DollarSign className="h-5 w-5 text-primary" />
-                <CardTitle className="text-xl">Sales Overview</CardTitle>
-              </div>
-              <Button variant="ghost" size="sm"><Download className="h-4 w-4 mr-2"/> Export</Button>
-            </div>
-            <CardDescription>Summary of financial performance for the selected period.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex justify-between p-3 bg-background rounded-md">
-              <p>Total Revenue:</p>
-              <p className="font-semibold text-green-500">${placeholderSalesData.totalRevenue.toFixed(2)}</p>
-            </div>
-            <div className="flex justify-between p-3 bg-background rounded-md">
-              <p>Job Orders Completed:</p>
-              <p className="font-semibold">{placeholderSalesData.jobOrdersCount}</p>
-            </div>
-            <div className="flex justify-between p-3 bg-background rounded-md">
-              <p>Average Job Value:</p>
-              <p className="font-semibold">${placeholderSalesData.averageJobValue.toFixed(2)}</p>
-            </div>
-          </CardContent>
-        </Card>
+      <div className="grid md:grid-cols-1 lg:grid-cols-2 gap-6">
+        <ReportCard 
+            title="Job Order Summary" 
+            description="Overview of job orders based on selected global filters (date, status, mechanic)."
+            reportKey="jobOrderSummary"
+            data={jobOrderSummary}
+            columns={[
+                { key: 'ID', label: 'ID' }, { key: 'Customer', label: 'Customer' }, { key: 'Motorcycle', label: 'Motorcycle' },
+                { key: 'Mechanic', label: 'Mechanic(s)' }, { key: 'Status', label: 'Status' }, { key: 'Date', label: 'Date' }, { key: 'Total', label: 'Total' }
+            ]}
+            onExport={() => handleExportCSV(jobOrderSummary, "Job Order Summary", ["ID", "Customer", "Motorcycle", "Mechanic(s)", "Status", "Date", "Total"])}
+        />
 
-        {/* Service Performance Card */}
-        <Card className="shadow-md">
-          <CardHeader>
-             <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                    <BarChart2 className="h-5 w-5 text-primary" />
-                    <CardTitle className="text-xl">Service Performance</CardTitle>
-                </div>
-                <Button variant="ghost" size="sm"><Download className="h-4 w-4 mr-2"/> Export</Button>
-            </div>
-            <CardDescription>Most frequently performed services and their revenue.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Service</TableHead>
-                  <TableHead className="text-center">Count</TableHead>
-                  <TableHead className="text-right">Revenue</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {placeholderTopServices.map(service => (
-                  <TableRow key={service.id}>
-                    <TableCell className="font-medium">{service.name}</TableCell>
-                    <TableCell className="text-center">{service.count}</TableCell>
-                    <TableCell className="text-right text-green-500">${service.revenue.toFixed(2)}</TableCell>
-                  </TableRow>
-                ))}
-                 {placeholderTopServices.length === 0 && (
-                    <TableRow><TableCell colSpan={3} className="text-center text-muted-foreground">No service data for this period.</TableCell></TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+        <ReportCard
+            title="Commission Report per Mechanic"
+            description="Tracks commissions earned by mechanics based on global filters (date, mechanic)."
+            reportKey="commissionReport"
+            data={commissionReport}
+            columns={[
+                { key: 'Mechanic', label: 'Mechanic' }, { key: 'JobOrderID', label: 'Job ID' }, { key: 'Service', label: 'Service' },
+                { key: 'LaborCost', label: 'Labor' }, { key: 'CommissionRate', label: 'Rate' }, { key: 'CommissionEarned', label: 'Earned' }
+            ]}
+            onExport={() => handleExportCSV(commissionReport, "Commission Report", ["Mechanic", "Job ID", "Service", "Labor Cost", "Commission Rate/Amount", "Commission Earned"])}
+        />
 
-        {/* Inventory Status Card */}
-        <Card className="shadow-md">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                    <Package className="h-5 w-5 text-primary" />
-                    <CardTitle className="text-xl">Inventory Insights</CardTitle>
-                </div>
-                <Button variant="ghost" size="sm"><Download className="h-4 w-4 mr-2"/> Export</Button>
-            </div>
-            <CardDescription>Overview of stock levels and part movement.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex justify-between p-3 bg-background rounded-md">
-                <p>Low Stock Items:</p>
-                <p className="font-semibold text-red-500">{placeholderInventoryData.lowStockItems}</p>
-            </div>
-            <div className="flex justify-between p-3 bg-background rounded-md">
-                <p>Total Inventory Value:</p>
-                <p className="font-semibold">${placeholderInventoryData.totalValue.toFixed(2)}</p>
-            </div>
-            <Separator className="my-2"/>
-            <h4 className="font-medium text-sm">Top Moving Items:</h4>
-            {placeholderInventoryData.topMovingItems.map(item => (
-                 <div key={item.id} className="flex justify-between text-xs p-2 bg-background/50 rounded-md">
-                    <p>{item.name}</p>
-                    <p className="font-semibold">{item.sold} sold</p>
-                </div>
-            ))}
-             {placeholderInventoryData.topMovingItems.length === 0 && (
-                <p className="text-xs text-muted-foreground text-center">No top moving items data.</p>
-            )}
-          </CardContent>
-        </Card>
+        <ReportCard
+            title="Parts Usage Report"
+            description="Details parts consumed in job orders within the selected date range."
+            reportKey="partsUsage"
+            data={partsUsageReport}
+            columns={[ { key: 'name', label: 'Part Name' }, { key: 'sku', label: 'SKU' }, { key: 'quantity', label: 'Qty Used' }, { key: 'totalValue', label: 'Total Value' }]}
+            onExport={() => handleExportCSV(partsUsageReport, "Parts Usage Report", ["Part Name", "SKU", "Quantity Used", "Total Value Used"])}
+        />
+        
+        <ReportCard
+            title="Service Sales Report"
+            description="Summary of services performed and revenue generated within the date range."
+            reportKey="serviceSales"
+            data={serviceSalesReport}
+            columns={[{ key: 'name', label: 'Service Name' }, { key: 'count', label: 'Times Performed' }, { key: 'totalRevenue', label: 'Total Labor Revenue' }]}
+            onExport={() => handleExportCSV(serviceSalesReport, "Service Sales Report")}
+        />
 
-        {/* Mechanic Activity Card */}
-        <Card className="shadow-md">
-          <CardHeader>
-             <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                    <UserCog className="h-5 w-5 text-primary" />
-                    <CardTitle className="text-xl">Mechanic Activity</CardTitle>
+        <ReportCard
+            title="Inventory Valuation Report"
+            description="Current valuation of your entire inventory. Not date dependent."
+            reportKey="inventoryValuation"
+            data={inventoryValuation.valuationDetails}
+            columns={[{ key: 'PartName', label: 'Part Name'}, { key: 'SKU', label: 'SKU' }, { key: 'Stock', label: 'Stock' }, { key: 'UnitValue', label: 'Unit Value' }, { key: 'LineValue', label: 'Line Value' }]}
+            onExport={() => handleExportCSV(inventoryValuation.valuationDetails, "Inventory Valuation")}
+        >
+            <p className="font-semibold text-lg mt-2">Total Inventory Value: {currencySymbol}{inventoryValuation.totalValue.toFixed(2)}</p>
+        </ReportCard>
+
+        <ReportCard
+            title="Income Summary"
+            description="Total income from payments received within the selected date range."
+            reportKey="incomeSummary"
+            data={[]} // Data is shown directly in children
+            columns={[]}
+             onExport={() => handleExportCSV([{ "Date Range": `${format(startDate || new Date(), "yyyy-MM-dd")} to ${format(endDate || new Date(), "yyyy-MM-dd")}`, "Total Income": `${currencySymbol}${incomeSummary.totalIncome.toFixed(2)}` }], "Income Summary")}
+        >
+             <p className="font-semibold text-lg mt-2">Total Income for Period: {currencySymbol}{incomeSummary.totalIncome.toFixed(2)}</p>
+        </ReportCard>
+        
+        <ReportCard
+            title="Customer Service History"
+            description="View all job orders for a specific customer."
+            reportKey="customerServiceHistory"
+            data={customerServiceHistory}
+            columns={[{ key: 'JobOrderID', label: 'Job ID' }, { key: 'Date', label: 'Date' }, { key: 'Motorcycle', label: 'Motorcycle' }, { key: 'Services', label: 'Services/Type' }, { key: 'Total', label: 'Total' }]}
+            customFilters={
+                <div className="grid gap-1.5 mb-4">
+                    <label className="text-sm font-medium">Select Customer</label>
+                    <Select value={selectedCustomerIdForHistory} onValueChange={setSelectedCustomerIdForHistory}>
+                        <SelectTrigger><SelectValue placeholder="Select a customer" /></SelectTrigger>
+                        <SelectContent>
+                        <SelectItem value="ALL" disabled>Select a customer</SelectItem>
+                        {allCustomers.map(cust => <SelectItem key={cust.id} value={cust.id}>{cust.firstName} {cust.lastName}</SelectItem>)}
+                        </SelectContent>
+                    </Select>
                 </div>
-                <Button variant="ghost" size="sm"><Download className="h-4 w-4 mr-2"/> Export</Button>
-            </div>
-            <CardDescription>Summary of job orders completed by mechanics.</CardDescription>
-          </CardHeader>
-          <CardContent>
-             <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Mechanic</TableHead>
-                  <TableHead className="text-center">Jobs</TableHead>
-                  <TableHead className="text-right">Total Labor</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {placeholderMechanicActivity.map(mech => (
-                  <TableRow key={mech.id}>
-                    <TableCell className="font-medium">{mech.name}</TableCell>
-                    <TableCell className="text-center">{mech.jobsCompleted}</TableCell>
-                    <TableCell className="text-right">${mech.totalLabor.toFixed(2)}</TableCell>
-                  </TableRow>
-                ))}
-                {placeholderMechanicActivity.length === 0 && (
-                    <TableRow><TableCell colSpan={3} className="text-center text-muted-foreground">No mechanic activity for this period.</TableCell></TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+            }
+            onExport={() => handleExportCSV(customerServiceHistory, `Customer Service History ${selectedCustomerIdForHistory !== "ALL" ? customerMap.get(selectedCustomerIdForHistory) : ""}`)}
+        />
       </div>
+      <CardDescription className="text-center text-xs mt-4">
+        Note: PDF and Excel exports are more complex and typically require server-side processing or dedicated client-side libraries. CSV export is provided as an example.
+      </CardDescription>
     </div>
   );
 }
-
-    
