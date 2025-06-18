@@ -14,13 +14,14 @@ import { getAuth, type Auth } from "firebase/auth";
 // ##  Firebase project's configuration.                                      ##
 // ##                                                                         ##
 // ##  FAILURE TO DO SO WILL RESULT IN 'auth/api-key-not-valid' ERRORS.       ##
+// ##  THIS IS THE MOST LIKELY CAUSE OF YOUR CURRENT LOGIN ISSUES.            ##
 // ##                                                                         ##
 // ##  HOW TO GET YOUR CONFIG:                                                ##
 // ##  1. Go to your Firebase project console: https://console.firebase.google.com/ ##
 // ##  2. Select your project.                                                ##
 // ##  3. Click on "Project settings" (the gear icon).                        ##
 // ##  4. Under "General" tab, scroll to "Your apps".                         ##
-// ##  5. If no web app, click "Add app" (</> icon).                          ##
+// ##  5. If no web app, click "Add app" (</> icon) and follow instructions.  ##
 // ##  6. Find your web app, select "Config" under "SDK setup".               ##
 // ##                                                                         ##
 // ##  RECOMMENDED: Use a `.env.local` file in your project root:             ##
@@ -52,7 +53,7 @@ let auth: Auth;
 // let db: Firestore;
 // let storage: FirebaseStorage;
 
-const IS_PLACEHOLDER_CONFIG = 
+const IS_PLACEHOLDER_CONFIG =
   !firebaseConfig.apiKey || firebaseConfig.apiKey.startsWith("YOUR_") ||
   !firebaseConfig.authDomain || firebaseConfig.authDomain.startsWith("YOUR_") ||
   !firebaseConfig.projectId || firebaseConfig.projectId.startsWith("YOUR_");
@@ -68,20 +69,34 @@ if (IS_PLACEHOLDER_CONFIG) {
   );
 }
 
-if (getApps().length === 0) {
-  if (!IS_PLACEHOLDER_CONFIG) {
-    app = initializeApp(firebaseConfig);
-  } else {
-    // Initialize with a dummy config to prevent app crashing further down the line,
-    // but Firebase services will not function. The error above is the primary indicator.
-    app = initializeApp({ apiKey: "INVALID_CONFIG_SEE_ERROR_ABOVE", authDomain: "", projectId: "" });
-  }
+// Initialize Firebase
+if (typeof window !== 'undefined') { // Ensure Firebase is initialized only on the client-side for Next.js App Router
+    if (getApps().length === 0) {
+        if (!IS_PLACEHOLDER_CONFIG) {
+            app = initializeApp(firebaseConfig);
+        } else {
+            // Initialize with a dummy config to prevent app crashing further down the line,
+            // but Firebase services will not function. The error above is the primary indicator.
+            app = initializeApp({ apiKey: "INVALID_CONFIG_SEE_ERROR_ABOVE", authDomain: "invalid.com", projectId: "invalid-project" });
+        }
+    } else {
+        app = getApps()[0];
+    }
+    auth = getAuth(app);
+    // db = getFirestore(app);
+    // storage = getStorage(app);
 } else {
-  app = getApps()[0];
+  // Handle server-side case if needed, though auth is primarily client-side
+  // For now, provide a non-functional placeholder if auth is accessed server-side without context
+  // This part might need adjustment based on server-side Firebase usage patterns
+  if (getApps().length === 0) {
+    app = initializeApp({ apiKey: "SERVER_STUB", authDomain: "server.stub", projectId: "server-stub"});
+  } else {
+    app = getApps()[0];
+  }
+  auth = getAuth(app); // This will likely not be functional server-side without specific setup
 }
 
-auth = getAuth(app);
-// db = getFirestore(app);
-// storage = getStorage(app);
 
 export { app, auth /*, db, storage */ };
+
