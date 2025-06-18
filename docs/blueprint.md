@@ -1,0 +1,74 @@
+# **App Name**: TorqueTrack
+
+## Core Features:
+
+- Login/Logout: Login/Logout functionality for user authentication.
+- Role-based access: Role-based access control (Admin, Cashier, Mechanic, Customer).
+- User activity logs: Logs of user activities within the application.
+- Password management & recovery: Password management and recovery features.
+- Job Order Management: Create, update, and delete job orders.
+- Job Order ID generation: Unique Job Order ID generation.
+- Select customer and motorcycle: Selection of customer and motorcycle for a job order.
+- Add services: Adding services to a job order with assigned mechanic, commission (fixed/percentage), and estimated hours/labor cost.
+- Add parts used: Adding parts used in a job order with quantity, price per unit, and stock deduction.
+- Status tracking: Tracking the status of a job order (Pending, In Progress, Completed, Released).
+- Notes and diagnostics: Notes and diagnostics for a job order.
+- Attach images: Attaching images to a job order (optional).
+- Print/View job order summary: Print/View job order summary for customer (without commissions).
+- Internal version with commission breakdown: Internal version of job order with commission breakdown.
+- Customer Management: Add/edit customer profiles with contact info, address, and notes.
+- View service history: View service history for a customer.
+- Search and filter: Search and filter customer profiles.
+- Motorcycle Registry: Register multiple motorcycles per customer with fields for Make, Model, Color, Plate Number, and Odometer.
+- View linked customer: View linked customer for a motorcycle.
+- Service history per motorcycle: View service history per motorcycle.
+- Inventory Management: Add/edit/delete parts with real-time stock level tracking.
+- Part details: Part details: Name, Brand, Category, Price, Cost, Supplier, Stock Quantity, Min Stock Alert.
+- Link parts to job orders: Link parts to job orders.
+- Import/export parts: Import/export parts (CSV/Excel).
+- Stock adjustment log: Stock adjustment log.
+- Inventory usage report: Inventory usage report.
+- Services Management: Add/edit/delete services.
+- Set default labor cost: Set default labor cost.
+- Set commission type: Set commission type (fixed amount or percentage).
+- Categorize services: Categorize services (e.g., Electrical, Mechanical, Maintenance).
+- Mechanic Management: Add/edit mechanic profiles.
+- Assign to specific services: Assign mechanics to specific services.
+- Track total commission earnings: Track total commission earnings for a mechanic.
+- View assigned job orders: View assigned job orders for a mechanic.
+- Active/Inactive status: Set active/inactive status for mechanics.
+- Job Order summary report: Job Order summary report (filter by date, status, mechanic).
+- Commission report per mechanic: Commission report per mechanic.
+- Parts usage report: Parts usage report.
+- Service sales report: Service sales report.
+- Inventory valuation: Inventory valuation report.
+- Daily/weekly/monthly income summary: Daily/weekly/monthly income summary.
+- Customer service history: Customer service history report.
+- Export reports: Export reports (CSV, Excel, PDF).
+- Payment & Invoicing: Track payment status (Paid, Partial, Unpaid).
+- Add payments and print receipts: Add payments and print receipts.
+- Track unpaid job orders: Track unpaid job orders.
+- Option for discounts or promos: Option for discounts or promos.
+- VAT/tax handling: VAT/tax handling (if applicable).
+- Printable job order: Printable job order for customer.
+- Mechanic worksheet: Mechanic worksheet/internal copy.
+- Invoice/Official receipt: Invoice/Official receipt.
+- Inventory list: Inventory list for audit.
+- Commission slip: Commission slip per mechanic.
+- Settings & Configuration: Shop name, logo, contact info settings.
+- Labor rate settings: Labor rate settings.
+- Commission configuration: Commission configuration.
+- Enable/disable modules: Enable/disable modules.
+- Backup and restore database: Backup and restore database.
+- Search: Search by customer name, plate number, part name, job order ID.
+- Filter: Filter by job order status, date range, mechanic, or customer.
+
+## Style Guidelines:
+
+- Primary color: Deep, slightly desaturated red (#222222) evokes power and mechanical precision.
+- Background color: Very dark grey (#FFA500) creates a strong contrast with the primary color, communicating quality.
+- Accent color: Muted gold (#FFFFFF) highlights important information without overwhelming the dark theme.
+- Font pairing: 'Space Grotesk' (sans-serif) for headlines, 'Inter' (sans-serif) for body text
+- Use clean, vectorized icons representing different motorcycle parts and tools.
+- Showcase featured parts and services prominently using a card-based layout.
+- Subtle transitions and hover effects for a premium feel.

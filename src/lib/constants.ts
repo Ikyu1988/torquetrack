@@ -1,0 +1,33 @@
+export const USER_ROLES = {
+  ADMIN: 'Admin',
+  CASHIER: 'Cashier',
+  MECHANIC: 'Mechanic',
+  CUSTOMER: 'Customer',
+} as const;
+
+export type UserRole = typeof USER_ROLES[keyof typeof USER_ROLES];
+
+export const JOB_ORDER_STATUSES = {
+  PENDING: 'Pending',
+  IN_PROGRESS: 'In Progress',
+  COMPLETED: 'Completed',
+  RELEASED: 'Released',
+  CANCELLED: 'Cancelled',
+} as const;
+
+export type JobOrderStatus = typeof JOB_ORDER_STATUSES[keyof typeof JOB_ORDER_STATUSES];
+
+export const PAYMENT_STATUSES = {
+  PAID: 'Paid',
+  PARTIAL: 'Partial',
+  UNPAID: 'Unpaid',
+} as const;
+
+export type PaymentStatus = typeof PAYMENT_STATUSES[keyof typeof PAYMENT_STATUSES];
+
+export const COMMISSION_TYPES = {
+  FIXED: 'Fixed',
+  PERCENTAGE: 'Percentage',
+} as const;
+
+export type CommissionType = typeof COMMISSION_TYPES[keyof typeof COMMISSION_TYPES];
