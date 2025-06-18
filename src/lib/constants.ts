@@ -39,3 +39,14 @@ export const COMMISSION_TYPES = {
 
 export type CommissionType = typeof COMMISSION_TYPES[keyof typeof COMMISSION_TYPES];
 export const COMMISSION_TYPE_OPTIONS = Object.values(COMMISSION_TYPES);
+
+export const PAYMENT_METHODS = {
+  CASH: 'Cash',
+  CREDIT_CARD: 'Credit Card',
+  DEBIT_CARD: 'Debit Card',
+  BANK_TRANSFER: 'Bank Transfer',
+  OTHER: 'Other',
+} as const;
+
+export type PaymentMethod = typeof PAYMENT_METHODS[keyof typeof PAYMENT_METHODS];
+export const PAYMENT_METHOD_OPTIONS = Object.values(PAYMENT_METHODS);

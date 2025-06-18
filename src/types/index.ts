@@ -1,5 +1,5 @@
 
-import type { UserRole, JobOrderStatus, PaymentStatus, CommissionType } from '@/lib/constants';
+import type { UserRole, JobOrderStatus, PaymentStatus, CommissionType, PaymentMethod } from '@/lib/constants';
 
 export interface User {
   id: string;
@@ -86,6 +86,17 @@ export interface JobOrderPartItem {
   totalPrice: number; // quantity * pricePerUnit
 }
 
+export interface Payment {
+  id: string;
+  jobOrderId: string;
+  amount: number;
+  paymentDate: Date;
+  method: PaymentMethod;
+  notes?: string;
+  processedByUserId: string; // Placeholder for user who processed payment
+  createdAt: Date;
+}
+
 export interface JobOrder {
   id: string;
   customerId: string;
@@ -108,6 +119,9 @@ export interface JobOrder {
   grandTotal: number;
   
   paymentStatus: PaymentStatus;
+  amountPaid: number; // Total amount paid for this job order
+  paymentHistory: Payment[]; // Array of payment transactions
+
   createdAt: Date;
   updatedAt: Date;
   createdByUserId: string; 
@@ -122,15 +136,7 @@ export interface Mechanic {
   updatedAt: Date;
 }
 
-export interface Payment {
-  id: string;
-  jobOrderId: string;
-  amount: number;
-  paymentDate: Date;
-  paymentMethod: string; 
-  notes?: string;
-  processedByUserId: string;
-}
+// Payment interface was moved up
 
 export interface ShopSettings {
   shopName: string;
@@ -141,3 +147,4 @@ export interface ShopSettings {
   defaultTaxRate?: number; // as a percentage, e.g., 10 for 10%
   updatedAt?: Date;
 }
+

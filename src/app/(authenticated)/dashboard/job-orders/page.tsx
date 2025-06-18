@@ -25,9 +25,10 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
-import type { JobOrder, Customer, Motorcycle, Part, Service } from "@/types";
+import type { JobOrder, Customer, Motorcycle, Part, Service, Payment } from "@/types";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
+import { PAYMENT_STATUSES } from "@/lib/constants";
 
 // Initial mock data for job orders
 const initialJobOrders: JobOrder[] = [
@@ -42,10 +43,12 @@ const initialJobOrders: JobOrder[] = [
     partsUsed: [
       { id: "jop1", partId: "part2", partName: "Oil Filter Hiflo HF204", quantity: 1, pricePerUnit: 12.50, totalPrice: 12.50 }
     ],
-    servicesDescription: "Standard oil change, chain lubrication.", // Can be supplemental
-    partsDescription: "Oil filter, 4L synthetic oil.", // Can be supplemental
-    grandTotal: 62.50, // 50 (labor) + 12.50 (parts)
-    paymentStatus: "Unpaid",
+    servicesDescription: "Standard oil change, chain lubrication.", 
+    partsDescription: "Oil filter, 4L synthetic oil.", 
+    grandTotal: 62.50, 
+    paymentStatus: PAYMENT_STATUSES.UNPAID,
+    amountPaid: 0,
+    paymentHistory: [],
     createdAt: new Date(2023, 10, 15),
     updatedAt: new Date(2023, 10, 16),
     createdByUserId: "user123",
@@ -60,13 +63,16 @@ const initialJobOrders: JobOrder[] = [
       { id: "jos2", serviceId: "svc2", serviceName: "Tire Replacement", laborCost: 150 }
     ],
     partsUsed: [
-      // Assuming part "Tire-Pirelli" exists with price 175
       { id: "jop2", partId: "someTirePartId1", partName: "Pirelli Diablo Rosso III (Front)", quantity: 1, pricePerUnit: 175, totalPrice: 175 },
       { id: "jop3", partId: "someTirePartId2", partName: "Pirelli Diablo Rosso III (Rear)", quantity: 1, pricePerUnit: 175, totalPrice: 175 }
     ],
     servicesDescription: "Tire replacement (front and rear), brake fluid flush.",
-    grandTotal: 500, // 150 (labor) + 350 (parts)
-    paymentStatus: "Paid",
+    grandTotal: 500, 
+    paymentStatus: PAYMENT_STATUSES.PAID,
+    amountPaid: 500,
+    paymentHistory: [
+        { id: "pay1", jobOrderId: "jo2", amount: 500, paymentDate: new Date(2023, 11, 3), method: "Credit Card", processedByUserId: "user456", createdAt: new Date(2023, 11, 3) }
+    ],
     createdAt: new Date(2023, 11, 1),
     updatedAt: new Date(2023, 11, 3),
     createdByUserId: "user456",
@@ -79,32 +85,32 @@ if (typeof window !== 'undefined') {
   if (!(window as any).__jobOrderStore) {
     (window as any).__jobOrderStore = {
       jobOrders: [...initialJobOrders],
-      addJobOrder: (jobOrderData: Omit<JobOrder, 'id' | 'createdAt' | 'updatedAt' | 'createdByUserId' | 'grandTotal'> & {grandTotal?: number}) => {
+      addJobOrder: (jobOrderData: Omit<JobOrder, 'id' | 'createdAt' | 'updatedAt' | 'createdByUserId' | 'grandTotal' | 'amountPaid' | 'paymentHistory'> & {grandTotal?: number}) => {
         const totalLabor = jobOrderData.servicesPerformed.reduce((sum, s) => sum + s.laborCost, 0);
         const totalParts = jobOrderData.partsUsed.reduce((sum, p) => sum + p.totalPrice, 0);
         const discount = Number(jobOrderData.discountAmount) || 0;
-        const tax = Number(jobOrderData.taxAmount) || 0; // Assuming tax might be added later
+        const tax = Number(jobOrderData.taxAmount) || 0; 
 
         const newJobOrder: JobOrder = {
           ...jobOrderData,
           id: String(Date.now()),
           grandTotal: totalLabor + totalParts - discount + tax,
+          amountPaid: 0,
+          paymentHistory: [],
+          // paymentStatus is set in the form, default or chosen by user
           createdAt: new Date(),
           updatedAt: new Date(),
           createdByUserId: "current_user_placeholder", 
         };
         (window as any).__jobOrderStore.jobOrders.push(newJobOrder);
 
-        // Deduct part quantities from inventory
         if ((window as any).__inventoryStore) {
           newJobOrder.partsUsed.forEach(item => {
             const partIndex = (window as any).__inventoryStore.parts.findIndex((p: Part) => p.id === item.partId);
             if (partIndex !== -1) {
               (window as any).__inventoryStore.parts[partIndex].stockQuantity -= item.quantity;
-              // Add a toast or log if stock goes negative, for real app might need better handling
               if ((window as any).__inventoryStore.parts[partIndex].stockQuantity < 0) {
                 console.warn(`Stock for part ${item.partName} is now negative.`);
-                 // Potentially use toast here via a global toast instance if available easily
               }
             }
           });
@@ -126,29 +132,25 @@ if (typeof window !== 'undefined') {
              updatedAt: new Date() 
             };
           
-          // Adjust inventory based on changes in partsUsed
           if ((window as any).__inventoryStore) {
-            // Revert quantities for parts that were in oldJobOrder but not in updatedJobOrder or changed quantity
             oldJobOrder.partsUsed.forEach(oldItem => {
               const newItem = updatedJobOrder.partsUsed.find(ni => ni.partId === oldItem.partId);
               const partIndex = (window as any).__inventoryStore.parts.findIndex((p: Part) => p.id === oldItem.partId);
               if (partIndex !== -1) {
-                if (!newItem) { // Part removed
+                if (!newItem) { 
                   (window as any).__inventoryStore.parts[partIndex].stockQuantity += oldItem.quantity;
-                } else if (newItem.quantity !== oldItem.quantity) { // Quantity changed
+                } else if (newItem.quantity !== oldItem.quantity) { 
                   (window as any).__inventoryStore.parts[partIndex].stockQuantity += (oldItem.quantity - newItem.quantity);
                 }
               }
             });
-            // Deduct quantities for new parts or parts with increased quantity
              updatedJobOrder.partsUsed.forEach(newItem => {
                 const oldItem = oldJobOrder.partsUsed.find(oi => oi.partId === newItem.partId);
                 const partIndex = (window as any).__inventoryStore.parts.findIndex((p: Part) => p.id === newItem.partId);
                 if(partIndex !== -1) {
-                    if(!oldItem) { // New part added
+                    if(!oldItem) { 
                          (window as any).__inventoryStore.parts[partIndex].stockQuantity -= newItem.quantity;
                     }
-                    // Quantity change already handled by reverting old and then applying new (implicit in loop)
                 }
              });
           }
@@ -157,13 +159,29 @@ if (typeof window !== 'undefined') {
         return false;
       },
       deleteJobOrder: (jobOrderId: string) => {
-        // Note: Does not revert inventory stock on delete for simplicity in this mock store.
-        // A real application would need to decide on this behavior.
         (window as any).__jobOrderStore.jobOrders = (window as any).__jobOrderStore.jobOrders.filter((jo: JobOrder) => jo.id !== jobOrderId);
         return true;
       },
       getJobOrderById: (jobOrderId: string) => {
         return (window as any).__jobOrderStore.jobOrders.find((jo: JobOrder) => jo.id === jobOrderId);
+      },
+      addPaymentToJobOrder: (jobOrderId: string, payment: Payment) => {
+        const joIndex = (window as any).__jobOrderStore.jobOrders.findIndex((jo: JobOrder) => jo.id === jobOrderId);
+        if (joIndex !== -1) {
+          const jobOrder = (window as any).__jobOrderStore.jobOrders[joIndex];
+          jobOrder.paymentHistory.push(payment);
+          jobOrder.amountPaid += payment.amount;
+          if (jobOrder.amountPaid >= jobOrder.grandTotal) {
+            jobOrder.paymentStatus = PAYMENT_STATUSES.PAID;
+          } else if (jobOrder.amountPaid > 0) {
+            jobOrder.paymentStatus = PAYMENT_STATUSES.PARTIAL;
+          } else {
+            jobOrder.paymentStatus = PAYMENT_STATUSES.UNPAID;
+          }
+          jobOrder.updatedAt = new Date();
+          return true;
+        }
+        return false;
       }
     };
   }
@@ -288,7 +306,7 @@ export default function JobOrdersPage() {
                     <TableCell>{customerMap.get(jo.customerId) || "N/A"}</TableCell>
                     <TableCell>{motorcycleMap.get(jo.motorcycleId) || "N/A"}</TableCell>
                     <TableCell><Badge variant={jo.status === "Completed" ? "default" : "secondary"}>{jo.status}</Badge></TableCell>
-                    <TableCell><Badge variant={jo.paymentStatus === "Paid" ? "default" : (jo.paymentStatus === "Unpaid" ? "destructive" : "secondary") }>{jo.paymentStatus}</Badge></TableCell>
+                    <TableCell><Badge variant={jo.paymentStatus === PAYMENT_STATUSES.PAID ? "default" : (jo.paymentStatus === PAYMENT_STATUSES.UNPAID ? "destructive" : "secondary") }>{jo.paymentStatus}</Badge></TableCell>
                     <TableCell className="text-right">${jo.grandTotal.toFixed(2)}</TableCell>
                     <TableCell>{format(new Date(jo.createdAt), "MMM dd, yyyy")}</TableCell>
                     <TableCell className="text-right space-x-1">
@@ -347,3 +365,4 @@ export default function JobOrdersPage() {
     </div>
   );
 }
+
