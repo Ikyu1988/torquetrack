@@ -68,46 +68,50 @@ export interface Part {
   updatedAt: Date;
 }
 
-// Simplified for initial Job Order pass, can be expanded later
 export interface JobOrderServiceItem {
-  serviceIdRef?: string; // Optional link to a Service
-  description: string;
+  id: string; // Unique ID for the line item itself
+  serviceId: string; // Reference to Service.id
+  serviceName: string; // Denormalized for display
   laborCost: number;
-  assignedMechanicId?: string;
+  assignedMechanicId?: string; // Optional
   notes?: string;
 }
 
 export interface JobOrderPartItem {
-  partIdRef?: string; // Optional link to a Part
-  description: string;
+  id: string; // Unique ID for the line item itself
+  partId: string; // Reference to Part.id
+  partName: string; // Denormalized for display
   quantity: number;
   pricePerUnit: number;
   totalPrice: number; // quantity * pricePerUnit
 }
 
 export interface JobOrder {
-  id: string; 
+  id: string;
   customerId: string;
   motorcycleId: string;
   status: JobOrderStatus;
   
-  // Simplified fields for initial implementation
+  servicesPerformed: JobOrderServiceItem[]; 
+  partsUsed: JobOrderPartItem[];          
+
+  // Optional legacy fields, can be phased out or used for additional notes
   servicesDescription?: string; 
   partsDescription?: string;    
-
-  // Detailed items - can be populated based on simplified fields or future UI
-  // servicesPerformed: JobOrderServiceItem[]; 
-  // partsUsed: JobOrderPartItem[];          
 
   diagnostics?: string;
   images?: string[]; 
   estimatedCompletionDate?: Date;
   actualCompletionDate?: Date;
-  totalLaborCost: number;
-  totalPartsCost: number;
+  
+  // These will be calculated from servicesPerformed and partsUsed sums
+  // totalLaborCost: number; 
+  // totalPartsCost: number;
+  
   discountAmount?: number;
-  taxAmount?: number;
-  grandTotal: number;
+  taxAmount?: number; // Keep for future tax calculation
+  grandTotal: number; // Calculated: sum(services) + sum(parts) - discount + tax
+  
   paymentStatus: PaymentStatus;
   createdAt: Date;
   updatedAt: Date;

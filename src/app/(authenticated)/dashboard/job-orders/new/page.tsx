@@ -2,13 +2,12 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm, Controller } from "react-hook-form";
+import { useForm, Controller, useFieldArray } from "react-hook-form";
 import * as z from "zod";
 import { Button } from "@/components/ui/button";
 import {
   Form,
   FormControl,
-  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -18,28 +17,50 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import Link from "next/link";
-import { ArrowLeft, ClipboardList, DollarSign } from "lucide-react";
+import { ArrowLeft, ClipboardList, DollarSign, PlusCircle, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
-import type { JobOrder, Customer, Motorcycle } from "@/types";
+import type { JobOrder, Customer, Motorcycle, Service, Part, Mechanic } from "@/types";
 import { useEffect, useState, useMemo } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DatePicker } from "@/components/ui/date-picker";
 import { JOB_ORDER_STATUS_OPTIONS, PAYMENT_STATUS_OPTIONS } from "@/lib/constants";
+import { Separator } from "@/components/ui/separator";
+
+const jobOrderServiceItemSchema = z.object({
+  id: z.string(),
+  serviceId: z.string().min(1, "Service selection is required."),
+  serviceName: z.string(), // Will be auto-filled
+  laborCost: z.coerce.number().min(0, "Labor cost must be non-negative."),
+  assignedMechanicId: z.string().optional(),
+  notes: z.string().optional(),
+});
+
+const jobOrderPartItemSchema = z.object({
+  id: z.string(),
+  partId: z.string().min(1, "Part selection is required."),
+  partName: z.string(), // Will be auto-filled
+  quantity: z.coerce.number().int().min(1, "Quantity must be at least 1."),
+  pricePerUnit: z.coerce.number().min(0), // Auto-filled
+  totalPrice: z.coerce.number().min(0), // Auto-calculated
+});
+
 
 const jobOrderFormSchema = z.object({
   customerId: z.string().min(1, { message: "Customer is required." }),
   motorcycleId: z.string().min(1, { message: "Motorcycle is required." }),
   status: z.enum(JOB_ORDER_STATUS_OPTIONS),
   diagnostics: z.string().max(1000).optional().or(z.literal('')),
-  servicesDescription: z.string().max(1000).optional().or(z.literal('')),
-  partsDescription: z.string().max(1000).optional().or(z.literal('')),
-  totalLaborCost: z.coerce.number().min(0, "Labor cost must be non-negative."),
-  totalPartsCost: z.coerce.number().min(0, "Parts cost must be non-negative."),
+  
+  servicesPerformed: z.array(jobOrderServiceItemSchema).min(0),
+  partsUsed: z.array(jobOrderPartItemSchema).min(0),
+
   discountAmount: z.coerce.number().min(0, "Discount must be non-negative.").optional().or(z.literal('')),
-  // taxAmount: z.coerce.number().min(0).optional(), // Add later if needed
   estimatedCompletionDate: z.date().optional(),
   paymentStatus: z.enum(PAYMENT_STATUS_OPTIONS),
+  // Legacy fields for notes, can be removed if not needed
+  servicesDescription: z.string().max(1000).optional().or(z.literal('')),
+  partsDescription: z.string().max(1000).optional().or(z.literal('')),
 });
 
 type JobOrderFormValues = z.infer<typeof jobOrderFormSchema>;
@@ -49,6 +70,9 @@ export default function NewJobOrderPage() {
   const router = useRouter();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [motorcycles, setMotorcycles] = useState<Motorcycle[]>([]);
+  const [availableServices, setAvailableServices] = useState<Service[]>([]);
+  const [availableParts, setAvailableParts] = useState<Part[]>([]);
+  const [availableMechanics, setAvailableMechanics] = useState<Mechanic[]>([]);
   const [isMounted, setIsMounted] = useState(false);
 
   const form = useForm<JobOrderFormValues>({
@@ -58,37 +82,53 @@ export default function NewJobOrderPage() {
       motorcycleId: "",
       status: "Pending",
       diagnostics: "",
-      servicesDescription: "",
-      partsDescription: "",
-      totalLaborCost: 0,
-      totalPartsCost: 0,
+      servicesPerformed: [],
+      partsUsed: [],
       discountAmount: undefined,
       estimatedCompletionDate: undefined,
       paymentStatus: "Unpaid",
+      servicesDescription: "",
+      partsDescription: "",
     },
   });
 
+  const { fields: serviceFields, append: appendService, remove: removeService } = useFieldArray({
+    control: form.control,
+    name: "servicesPerformed",
+  });
+
+  const { fields: partFields, append: appendPart, remove: removePart } = useFieldArray({
+    control: form.control,
+    name: "partsUsed",
+  });
+
   const selectedCustomerId = form.watch("customerId");
-  const totalLaborCost = form.watch("totalLaborCost") || 0;
-  const totalPartsCost = form.watch("totalPartsCost") || 0;
+  const servicesPerformed = form.watch("servicesPerformed");
+  const partsUsed = form.watch("partsUsed");
   const discountAmount = form.watch("discountAmount") || 0;
 
+  const totalLaborCost = useMemo(() => {
+    return servicesPerformed.reduce((sum, item) => sum + (Number(item.laborCost) || 0), 0);
+  }, [servicesPerformed]);
+
+  const totalPartsCost = useMemo(() => {
+    return partsUsed.reduce((sum, item) => sum + (Number(item.totalPrice) || 0), 0);
+  }, [partsUsed]);
+  
   const grandTotal = useMemo(() => {
-    const labor = Number(totalLaborCost) || 0;
-    const parts = Number(totalPartsCost) || 0;
     const discount = Number(discountAmount) || 0;
-    return labor + parts - discount;
+    return totalLaborCost + totalPartsCost - discount;
   }, [totalLaborCost, totalPartsCost, discountAmount]);
+
 
   useEffect(() => {
     setIsMounted(true);
     if (typeof window !== 'undefined') {
-      if ((window as any).__customerStore) {
-        setCustomers((window as any).__customerStore.customers);
-      }
-      if ((window as any).__motorcycleStore) {
-        setMotorcycles((window as any).__motorcycleStore.motorcycles);
-      }
+      if ((window as any).__customerStore) setCustomers((window as any).__customerStore.customers);
+      if ((window as any).__motorcycleStore) setMotorcycles((window as any).__motorcycleStore.motorcycles);
+      if ((window as any).__serviceStore) setAvailableServices((window as any).__serviceStore.services.filter((s: Service) => s.isActive));
+      if ((window as any).__inventoryStore) setAvailableParts((window as any).__inventoryStore.parts.filter((p: Part) => p.isActive));
+      if ((window as any).__mechanicStore) setAvailableMechanics((window as any).__mechanicStore.mechanics.filter((m: Mechanic) => m.isActive));
     }
   }, []);
 
@@ -98,7 +138,6 @@ export default function NewJobOrderPage() {
   }, [selectedCustomerId, motorcycles]);
   
   useEffect(() => {
-    // Reset motorcycleId if customer changes and selected motorcycle doesn't belong to new customer
     if (selectedCustomerId && form.getValues("motorcycleId")) {
         const currentMotorcycle = motorcycles.find(m => m.id === form.getValues("motorcycleId"));
         if (currentMotorcycle && currentMotorcycle.customerId !== selectedCustomerId) {
@@ -111,9 +150,10 @@ export default function NewJobOrderPage() {
   function onSubmit(data: JobOrderFormValues) {
     let newJobOrder: JobOrder | null = null;
     if (typeof window !== 'undefined' && (window as any).__jobOrderStore) {
-        const jobOrderData: Omit<JobOrder, 'id' | 'createdAt' | 'updatedAt' | 'createdByUserId' | 'grandTotal'> = {
+        const jobOrderData: Omit<JobOrder, 'id' | 'createdAt' | 'updatedAt' | 'createdByUserId' | 'grandTotal'> & { grandTotal?: number } = {
             ...data,
             discountAmount: data.discountAmount === '' ? undefined : Number(data.discountAmount),
+            // grandTotal will be calculated in the store
         };
       newJobOrder = (window as any).__jobOrderStore.addJobOrder(jobOrderData);
     }
@@ -158,6 +198,7 @@ export default function NewJobOrderPage() {
         <CardContent>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+              {/* Customer and Motorcycle Selection */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <FormField
                   control={form.control}
@@ -210,6 +251,7 @@ export default function NewJobOrderPage() {
                 />
               </div>
 
+              {/* Status and Diagnostics */}
               <FormField
                 control={form.control}
                 name="status"
@@ -232,7 +274,6 @@ export default function NewJobOrderPage() {
                   </FormItem>
                 )}
               />
-              
               <FormField
                 control={form.control}
                 name="diagnostics"
@@ -246,87 +287,244 @@ export default function NewJobOrderPage() {
                   </FormItem>
                 )}
               />
-              
-              <FormField
-                control={form.control}
-                name="servicesDescription"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Services Description (Optional)</FormLabel>
-                    <FormControl>
-                      <Textarea placeholder="List services to be performed or completed..." {...field} rows={3} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
 
-              <FormField
-                control={form.control}
-                name="partsDescription"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Parts Description (Optional)</FormLabel>
-                    <FormControl>
-                      <Textarea placeholder="List parts used or to be used..." {...field} rows={3} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 items-end">
-                 <FormField
-                  control={form.control}
-                  name="totalLaborCost"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Total Labor Cost</FormLabel>
-                      <FormControl>
-                        <div className="relative">
-                          <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                          <Input type="number" step="0.01" placeholder="0.00" {...field} className="pl-8" onChange={e => field.onChange(parseFloat(e.target.value) || 0)} />
-                        </div>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="totalPartsCost"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Total Parts Cost</FormLabel>
-                      <FormControl>
-                        <div className="relative">
-                          <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                          <Input type="number" step="0.01" placeholder="0.00" {...field} className="pl-8" onChange={e => field.onChange(parseFloat(e.target.value) || 0)} />
-                        </div>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="discountAmount"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Discount Amount (Optional)</FormLabel>
-                      <FormControl>
-                        <div className="relative">
-                           <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                          <Input type="number" step="0.01" placeholder="0.00" {...field} className="pl-8" onChange={e => field.onChange(e.target.value === '' ? '' : parseFloat(e.target.value) || 0)} />
-                        </div>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+              {/* Services Performed Section */}
+              <Separator />
+              <div className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <h3 className="text-lg font-medium">Services Performed</h3>
+                  <Button type="button" variant="outline" size="sm" onClick={() => appendService({ id: Date.now().toString(), serviceId: "", serviceName: "", laborCost: 0 })}>
+                    <PlusCircle className="mr-2 h-4 w-4" /> Add Service
+                  </Button>
+                </div>
+                {serviceFields.map((item, index) => (
+                  <Card key={item.id} className="p-4 space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <FormField
+                        control={form.control}
+                        name={`servicesPerformed.${index}.serviceId`}
+                        render={({ field }) => (
+                          <FormItem className="md:col-span-2">
+                            <FormLabel>Service</FormLabel>
+                            <Select 
+                              onValueChange={(value) => {
+                                field.onChange(value);
+                                const selectedService = availableServices.find(s => s.id === value);
+                                form.setValue(`servicesPerformed.${index}.serviceName`, selectedService?.name || "");
+                                form.setValue(`servicesPerformed.${index}.laborCost`, selectedService?.defaultLaborCost || 0);
+                              }} 
+                              defaultValue={field.value}
+                            >
+                              <FormControl><SelectTrigger><SelectValue placeholder="Select a service" /></SelectTrigger></FormControl>
+                              <SelectContent>
+                                {availableServices.map(service => (
+                                  <SelectItem key={service.id} value={service.id}>{service.name} (${service.defaultLaborCost.toFixed(2)})</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name={`servicesPerformed.${index}.laborCost`}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Labor Cost</FormLabel>
+                            <FormControl>
+                              <div className="relative">
+                                <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                <Input type="number" step="0.01" {...field} className="pl-8" onChange={e => field.onChange(parseFloat(e.target.value) || 0)} />
+                              </div>
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                     <FormField
+                        control={form.control}
+                        name={`servicesPerformed.${index}.assignedMechanicId`}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Assigned Mechanic (Optional)</FormLabel>
+                            <Select onValueChange={field.onChange} defaultValue={field.value}>
+                              <FormControl><SelectTrigger><SelectValue placeholder="Select mechanic" /></SelectTrigger></FormControl>
+                              <SelectContent>
+                                <SelectItem value="">None</SelectItem>
+                                {availableMechanics.map(mech => (
+                                  <SelectItem key={mech.id} value={mech.id}>{mech.name}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    <FormField
+                        control={form.control}
+                        name={`servicesPerformed.${index}.notes`}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Service Notes (Optional)</FormLabel>
+                            <FormControl><Textarea placeholder="Notes for this service..." {...field} rows={2} /></FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    <Button type="button" variant="ghost" size="sm" onClick={() => removeService(index)} className="text-destructive hover:text-destructive/90">
+                      <Trash2 className="mr-2 h-4 w-4" /> Remove Service
+                    </Button>
+                  </Card>
+                ))}
+                 {serviceFields.length === 0 && <p className="text-sm text-muted-foreground">No services added yet.</p>}
               </div>
+              <FormField
+                  control={form.control}
+                  name="servicesDescription"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Additional Service Notes / Overall (Optional)</FormLabel>
+                      <FormControl>
+                        <Textarea placeholder="General notes about services..." {...field} rows={2} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-              <Card className="bg-muted/50">
+
+              {/* Parts Used Section */}
+              <Separator />
+              <div className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <h3 className="text-lg font-medium">Parts Used</h3>
+                  <Button type="button" variant="outline" size="sm" onClick={() => appendPart({ id: Date.now().toString(), partId: "", partName: "", quantity: 1, pricePerUnit: 0, totalPrice: 0 })}>
+                    <PlusCircle className="mr-2 h-4 w-4" /> Add Part
+                  </Button>
+                </div>
+                {partFields.map((item, index) => (
+                  <Card key={item.id} className="p-4 space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                       <FormField
+                        control={form.control}
+                        name={`partsUsed.${index}.partId`}
+                        render={({ field }) => (
+                          <FormItem className="md:col-span-2">
+                            <FormLabel>Part</FormLabel>
+                            <Select 
+                              onValueChange={(value) => {
+                                field.onChange(value);
+                                const selectedPart = availableParts.find(p => p.id === value);
+                                form.setValue(`partsUsed.${index}.partName`, selectedPart?.name || "");
+                                form.setValue(`partsUsed.${index}.pricePerUnit`, selectedPart?.price || 0);
+                                const qty = form.getValues(`partsUsed.${index}.quantity`) || 1;
+                                form.setValue(`partsUsed.${index}.totalPrice`, (selectedPart?.price || 0) * qty);
+                              }} 
+                              defaultValue={field.value}
+                            >
+                              <FormControl><SelectTrigger><SelectValue placeholder="Select a part" /></SelectTrigger></FormControl>
+                              <SelectContent>
+                                {availableParts.map(part => (
+                                  <SelectItem key={part.id} value={part.id}>{part.name} (Stock: {part.stockQuantity}, Price: ${part.price.toFixed(2)})</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name={`partsUsed.${index}.quantity`}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Quantity</FormLabel>
+                            <FormControl>
+                              <Input 
+                                type="number" 
+                                {...field} 
+                                onChange={e => {
+                                  const qty = parseInt(e.target.value, 10) || 0;
+                                  field.onChange(qty);
+                                  const pricePerUnit = form.getValues(`partsUsed.${index}.pricePerUnit`) || 0;
+                                  form.setValue(`partsUsed.${index}.totalPrice`, pricePerUnit * qty);
+                                }}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                       <FormItem>
+                          <FormLabel>Total Price</FormLabel>
+                          <div className="relative">
+                            <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                            <Input 
+                              type="number" 
+                              value={form.getValues(`partsUsed.${index}.totalPrice`).toFixed(2)} 
+                              readOnly 
+                              className="pl-8 bg-muted/50" 
+                            />
+                          </div>
+                        </FormItem>
+                    </div>
+                    <Button type="button" variant="ghost" size="sm" onClick={() => removePart(index)} className="text-destructive hover:text-destructive/90">
+                       <Trash2 className="mr-2 h-4 w-4" /> Remove Part
+                    </Button>
+                  </Card>
+                ))}
+                {partFields.length === 0 && <p className="text-sm text-muted-foreground">No parts added yet.</p>}
+              </div>
+               <FormField
+                  control={form.control}
+                  name="partsDescription"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Additional Part Notes / Overall (Optional)</FormLabel>
+                      <FormControl>
+                        <Textarea placeholder="General notes about parts..." {...field} rows={2} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+              {/* Cost Summary */}
+              <Separator />
+               <Card className="bg-muted/20 p-2">
+                <CardHeader className="p-2 pb-0"><CardTitle className="text-lg">Cost Calculation</CardTitle></CardHeader>
+                <CardContent className="p-2 space-y-2">
+                    <div className="flex justify-between items-center">
+                        <span className="text-sm font-medium">Total Labor Cost:</span>
+                        <span className="text-sm font-semibold">${totalLaborCost.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                        <span className="text-sm font-medium">Total Parts Cost:</span>
+                        <span className="text-sm font-semibold">${totalPartsCost.toFixed(2)}</span>
+                    </div>
+                    <FormField
+                      control={form.control}
+                      name="discountAmount"
+                      render={({ field }) => (
+                        <FormItem className="flex justify-between items-center">
+                          <FormLabel className="text-sm font-medium">Discount Amount:</FormLabel>
+                          <div className="relative w-32">
+                            <DollarSign className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
+                            <Input 
+                              type="number" step="0.01" placeholder="0.00" {...field} 
+                              className="pl-6 h-8 text-sm" 
+                              onChange={e => field.onChange(e.target.value === '' ? '' : parseFloat(e.target.value) || 0)} />
+                          </div>
+                           <FormMessage className="text-xs col-span-full" />
+                        </FormItem>
+                      )}
+                    />
+                </CardContent>
+              </Card>
+
+              <Card className="bg-primary/10">
                 <CardContent className="p-4">
                     <div className="flex justify-between items-center">
                         <span className="text-lg font-semibold">Grand Total:</span>
@@ -336,6 +534,8 @@ export default function NewJobOrderPage() {
               </Card>
 
 
+              {/* Dates and Payment */}
+              <Separator />
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <FormField
                   control={form.control}

@@ -25,7 +25,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
-import type { JobOrder, Customer, Motorcycle } from "@/types";
+import type { JobOrder, Customer, Motorcycle, Part, Service } from "@/types";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 
@@ -36,11 +36,15 @@ const initialJobOrders: JobOrder[] = [
     customerId: "1", // John Doe
     motorcycleId: "m1", // Honda CBR600RR
     status: "In Progress",
-    servicesDescription: "Standard oil change, chain lubrication.",
-    partsDescription: "Oil filter, 4L synthetic oil.",
-    totalLaborCost: 75,
-    totalPartsCost: 45,
-    grandTotal: 120,
+    servicesPerformed: [
+      { id: "jos1", serviceId: "svc1", serviceName: "Oil Change", laborCost: 50 }
+    ],
+    partsUsed: [
+      { id: "jop1", partId: "part2", partName: "Oil Filter Hiflo HF204", quantity: 1, pricePerUnit: 12.50, totalPrice: 12.50 }
+    ],
+    servicesDescription: "Standard oil change, chain lubrication.", // Can be supplemental
+    partsDescription: "Oil filter, 4L synthetic oil.", // Can be supplemental
+    grandTotal: 62.50, // 50 (labor) + 12.50 (parts)
     paymentStatus: "Unpaid",
     createdAt: new Date(2023, 10, 15),
     updatedAt: new Date(2023, 10, 16),
@@ -52,11 +56,16 @@ const initialJobOrders: JobOrder[] = [
     customerId: "2", // Jane Smith
     motorcycleId: "m2", // Yamaha MT-07
     status: "Completed",
+    servicesPerformed: [
+      { id: "jos2", serviceId: "svc2", serviceName: "Tire Replacement", laborCost: 150 }
+    ],
+    partsUsed: [
+      // Assuming part "Tire-Pirelli" exists with price 175
+      { id: "jop2", partId: "someTirePartId1", partName: "Pirelli Diablo Rosso III (Front)", quantity: 1, pricePerUnit: 175, totalPrice: 175 },
+      { id: "jop3", partId: "someTirePartId2", partName: "Pirelli Diablo Rosso III (Rear)", quantity: 1, pricePerUnit: 175, totalPrice: 175 }
+    ],
     servicesDescription: "Tire replacement (front and rear), brake fluid flush.",
-    partsDescription: "2x Pirelli Diablo Rosso III tires, DOT4 brake fluid.",
-    totalLaborCost: 150,
-    totalPartsCost: 350,
-    grandTotal: 500,
+    grandTotal: 500, // 150 (labor) + 350 (parts)
     paymentStatus: "Paid",
     createdAt: new Date(2023, 11, 1),
     updatedAt: new Date(2023, 11, 3),
@@ -70,31 +79,86 @@ if (typeof window !== 'undefined') {
   if (!(window as any).__jobOrderStore) {
     (window as any).__jobOrderStore = {
       jobOrders: [...initialJobOrders],
-      addJobOrder: (jobOrder: Omit<JobOrder, 'id' | 'createdAt' | 'updatedAt' | 'createdByUserId' | 'grandTotal'>) => {
+      addJobOrder: (jobOrderData: Omit<JobOrder, 'id' | 'createdAt' | 'updatedAt' | 'createdByUserId' | 'grandTotal'> & {grandTotal?: number}) => {
+        const totalLabor = jobOrderData.servicesPerformed.reduce((sum, s) => sum + s.laborCost, 0);
+        const totalParts = jobOrderData.partsUsed.reduce((sum, p) => sum + p.totalPrice, 0);
+        const discount = Number(jobOrderData.discountAmount) || 0;
+        const tax = Number(jobOrderData.taxAmount) || 0; // Assuming tax might be added later
+
         const newJobOrder: JobOrder = {
-          ...jobOrder,
+          ...jobOrderData,
           id: String(Date.now()),
-          grandTotal: jobOrder.totalLaborCost + jobOrder.totalPartsCost - (jobOrder.discountAmount || 0) + (jobOrder.taxAmount || 0),
+          grandTotal: totalLabor + totalParts - discount + tax,
           createdAt: new Date(),
           updatedAt: new Date(),
-          createdByUserId: "current_user_placeholder", // Replace with actual user ID
+          createdByUserId: "current_user_placeholder", 
         };
         (window as any).__jobOrderStore.jobOrders.push(newJobOrder);
+
+        // Deduct part quantities from inventory
+        if ((window as any).__inventoryStore) {
+          newJobOrder.partsUsed.forEach(item => {
+            const partIndex = (window as any).__inventoryStore.parts.findIndex((p: Part) => p.id === item.partId);
+            if (partIndex !== -1) {
+              (window as any).__inventoryStore.parts[partIndex].stockQuantity -= item.quantity;
+              // Add a toast or log if stock goes negative, for real app might need better handling
+              if ((window as any).__inventoryStore.parts[partIndex].stockQuantity < 0) {
+                console.warn(`Stock for part ${item.partName} is now negative.`);
+                 // Potentially use toast here via a global toast instance if available easily
+              }
+            }
+          });
+        }
         return newJobOrder;
       },
       updateJobOrder: (updatedJobOrder: JobOrder) => {
         const index = (window as any).__jobOrderStore.jobOrders.findIndex((jo: JobOrder) => jo.id === updatedJobOrder.id);
         if (index !== -1) {
+          const oldJobOrder = (window as any).__jobOrderStore.jobOrders[index];
+          const totalLabor = updatedJobOrder.servicesPerformed.reduce((sum, s) => sum + s.laborCost, 0);
+          const totalParts = updatedJobOrder.partsUsed.reduce((sum, p) => sum + p.totalPrice, 0);
+          const discount = Number(updatedJobOrder.discountAmount) || 0;
+          const tax = Number(updatedJobOrder.taxAmount) || 0;
+
           (window as any).__jobOrderStore.jobOrders[index] = {
              ...updatedJobOrder,
-             grandTotal: updatedJobOrder.totalLaborCost + updatedJobOrder.totalPartsCost - (updatedJobOrder.discountAmount || 0) + (updatedJobOrder.taxAmount || 0),
+             grandTotal: totalLabor + totalParts - discount + tax,
              updatedAt: new Date() 
             };
+          
+          // Adjust inventory based on changes in partsUsed
+          if ((window as any).__inventoryStore) {
+            // Revert quantities for parts that were in oldJobOrder but not in updatedJobOrder or changed quantity
+            oldJobOrder.partsUsed.forEach(oldItem => {
+              const newItem = updatedJobOrder.partsUsed.find(ni => ni.partId === oldItem.partId);
+              const partIndex = (window as any).__inventoryStore.parts.findIndex((p: Part) => p.id === oldItem.partId);
+              if (partIndex !== -1) {
+                if (!newItem) { // Part removed
+                  (window as any).__inventoryStore.parts[partIndex].stockQuantity += oldItem.quantity;
+                } else if (newItem.quantity !== oldItem.quantity) { // Quantity changed
+                  (window as any).__inventoryStore.parts[partIndex].stockQuantity += (oldItem.quantity - newItem.quantity);
+                }
+              }
+            });
+            // Deduct quantities for new parts or parts with increased quantity
+             updatedJobOrder.partsUsed.forEach(newItem => {
+                const oldItem = oldJobOrder.partsUsed.find(oi => oi.partId === newItem.partId);
+                const partIndex = (window as any).__inventoryStore.parts.findIndex((p: Part) => p.id === newItem.partId);
+                if(partIndex !== -1) {
+                    if(!oldItem) { // New part added
+                         (window as any).__inventoryStore.parts[partIndex].stockQuantity -= newItem.quantity;
+                    }
+                    // Quantity change already handled by reverting old and then applying new (implicit in loop)
+                }
+             });
+          }
           return true;
         }
         return false;
       },
       deleteJobOrder: (jobOrderId: string) => {
+        // Note: Does not revert inventory stock on delete for simplicity in this mock store.
+        // A real application would need to decide on this behavior.
         (window as any).__jobOrderStore.jobOrders = (window as any).__jobOrderStore.jobOrders.filter((jo: JobOrder) => jo.id !== jobOrderId);
         return true;
       },
@@ -173,7 +237,7 @@ export default function JobOrdersPage() {
         refreshJobOrders();
         toast({
           title: "Job Order Deleted",
-          description: `Job Order #${jobOrderToDelete.id} has been successfully deleted.`,
+          description: `Job Order #${jobOrderToDelete.id.substring(0,6)} has been successfully deleted.`,
         });
       }
     }
