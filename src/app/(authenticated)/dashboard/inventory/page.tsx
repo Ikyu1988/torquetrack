@@ -337,19 +337,19 @@ export default function InventoryPage() {
                         rowIsValid = false;
                     }
                 }
-                partData[mapping.targetKey] = undefined; 
+                (partData as any)[mapping.targetKey] = undefined; 
                 return;
             }
 
             try {
                 switch (mapping.type) {
                     case 'string':
-                        partData[mapping.targetKey] = valueStr.startsWith('"') && valueStr.endsWith('"') ? valueStr.slice(1, -1) : valueStr;
+                        (partData as any)[mapping.targetKey] = valueStr.startsWith('"') && valueStr.endsWith('"') ? valueStr.slice(1, -1) : valueStr;
                         break;
                     case 'number':
                         const numVal = parseFloat(valueStr);
                         if (isNaN(numVal)) {
-                            if (!mapping.optional) rowIsValid = false; else partData[mapping.targetKey] = undefined;
+                            if (!mapping.optional) rowIsValid = false; else (partData as any)[mapping.targetKey] = undefined;
                         } else {
                             (partData as any)[mapping.targetKey] = numVal;
                         }
@@ -357,7 +357,7 @@ export default function InventoryPage() {
                     case 'integer':
                         const intVal = parseInt(valueStr, 10);
                          if (isNaN(intVal)) {
-                            if (!mapping.optional) rowIsValid = false; else partData[mapping.targetKey] = undefined;
+                            if (!mapping.optional) rowIsValid = false; else (partData as any)[mapping.targetKey] = undefined;
                         } else {
                             (partData as any)[mapping.targetKey] = intVal;
                         }
@@ -369,7 +369,7 @@ export default function InventoryPage() {
                         } else if (lowerVal === 'false' || lowerVal === '0') {
                             partData[mapping.targetKey] = false;
                         } else {
-                             if (!mapping.optional) rowIsValid = false; else partData[mapping.targetKey] = undefined;
+                             if (!mapping.optional) rowIsValid = false; else (partData as any)[mapping.targetKey] = undefined;
                         }
                         break;
                 }
