@@ -86,7 +86,7 @@ if (typeof window !== 'undefined') {
           paymentHistory: [],
           createdAt: new Date(),
           updatedAt: new Date(),
-          createdByUserId: "current_user_placeholder",
+          // createdByUserId: "current_user_placeholder", // This was already in the store
         };
 
         if (newSalesOrder.paymentStatus === PAYMENT_STATUSES.PAID && newSalesOrder.amountPaid > 0) {
@@ -259,11 +259,12 @@ export default function DirectSalesPage() {
             status: data.status,
             items: data.items.map(p => ({...p})), 
             discountAmount: data.discountAmount === '' ? undefined : Number(data.discountAmount),
-            paymentStatus: PAYMENT_STATUSES.PAID, // Direct sales are typically paid immediately
+            paymentStatus: PAYMENT_STATUSES.PAID, 
             initialPaymentMethod: data.paymentMethod, 
             initialPaymentNotes: data.paymentNotes || `Payment for direct sale`,
             taxAmount: calculatedTaxAmountForDisplay,
             notes: "Direct Parts Sale",
+            createdByUserId: "current_user_placeholder", // Added missing property
         };
       
       try {
@@ -275,7 +276,7 @@ export default function DirectSalesPage() {
             description: `Direct sale #${newSaleOrder.id.substring(0,6)} processed successfully. Grand Total: ${currency}${newSaleOrder.grandTotal.toFixed(2)}`,
           });
           form.reset({ customerId: undefined, items: [], discountAmount: undefined, paymentMethod: "Cash", paymentNotes: "", status: SALES_ORDER_STATUSES.COMPLETED });
-          fetchAndSetData(); // Refresh lists after sale
+          fetchAndSetData(); 
         } else {
            toast({
             title: "Processing Error",
@@ -607,5 +608,3 @@ export default function DirectSalesPage() {
     </div>
   );
 }
-
-
