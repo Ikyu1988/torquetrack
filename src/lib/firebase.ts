@@ -60,12 +60,7 @@ const IS_PLACEHOLDER_CONFIG =
 
 if (IS_PLACEHOLDER_CONFIG) {
   console.error(
-    "🚨🚨🚨 FATAL FIREBASE CONFIG ERROR 🚨🚨🚨\n" +
-    "Firebase configuration is MISSING or uses PLACEHOLDER values.\n" +
-    "You MUST provide your actual Firebase project credentials in `src/lib/firebase.ts` " +
-    "or (recommended) in a `.env.local` file.\n" +
-    "Please refer to the comments in `src/lib/firebase.ts` for detailed instructions.\n" +
-    "Authentication and other Firebase services WILL NOT WORK until this is fixed."
+    "FATAL FIREBASE CONFIG ERROR: Firebase configuration is MISSING or uses PLACEHOLDER values. Update src/lib/firebase.ts or .env.local."
   );
 }
 
