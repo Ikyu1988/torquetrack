@@ -1,8 +1,10 @@
 
 
-import type { UserRole, JobOrderStatus, PaymentStatus, CommissionType, PaymentMethod as ImportedPaymentMethod, PurchaseRequisitionStatus, PurchaseOrderStatus, GoodsReceiptStatus, SalesOrderStatus } from '@/lib/constants';
+
+import type { UserRole, JobOrderStatus, PaymentStatus, CommissionType, PaymentMethod as ImportedPaymentMethod, PurchaseRequisitionStatus, PurchaseOrderStatus, GoodsReceiptStatus as ImportedGoodsReceiptStatus, SalesOrderStatus } from '@/lib/constants';
 
 export type PaymentMethod = ImportedPaymentMethod; // Explicitly re-export the type
+export type GoodsReceiptStatus = ImportedGoodsReceiptStatus; // Explicitly re-export the type
 
 export interface User {
   id: string;
@@ -287,3 +289,4 @@ export interface GoodsReceipt {
   createdAt: Date;
   updatedAt: Date;
 }
+
