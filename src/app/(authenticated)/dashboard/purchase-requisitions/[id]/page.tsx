@@ -68,21 +68,29 @@ export default function ViewPurchaseRequisitionPage() {
 
   const DetailItem = ({ label, value, className, isBadge = false, badgeVariant = "secondary" }: { label:string, value?: string | number | Date | null, className?: string, isBadge?:boolean, badgeVariant?: "default" | "secondary" | "destructive" | "outline" | null | undefined }) => {
     if (value === undefined || value === null || value === '') return null;
-    let displayValue: React.ReactNode = value;
+    
+    let finalDisplayValue: React.ReactNode;
+
     if (value instanceof Date) {
-      displayValue = format(value, "PPP p");
+      finalDisplayValue = format(value, "PPP p");
     } else if (typeof value === 'number' && (label.toLowerCase().includes('value') || label.toLowerCase().includes('price'))){
-        displayValue = `${currency}${value.toFixed(2)}`;
+        finalDisplayValue = `${currency}${value.toFixed(2)}`;
+    } else {
+        finalDisplayValue = value; 
     }
 
-    if (isBadge && typeof displayValue === 'string') {
-        displayValue = <Badge variant={badgeVariant}>{displayValue}</Badge>;
+    if (isBadge && typeof finalDisplayValue === 'string') { 
+        finalDisplayValue = <Badge variant={badgeVariant}>{finalDisplayValue}</Badge>;
     }
     
     return (
       <div className={className}>
         <p className="text-sm text-muted-foreground">{label}</p>
-        <p className="font-medium">{displayValue}</p>
+        {typeof finalDisplayValue === 'string' || typeof finalDisplayValue === 'number' ? (
+          <p className="font-medium">{finalDisplayValue}</p>
+        ) : (
+          finalDisplayValue
+        )}
       </div>
     );
   };

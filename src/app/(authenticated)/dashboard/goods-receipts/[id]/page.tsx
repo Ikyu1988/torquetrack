@@ -73,15 +73,19 @@ export default function ViewGoodsReceiptPage() {
 
   const DetailItem = ({ label, value, className }: { label:string, value?: string | number | Date | null, className?: string}) => {
     if (value === undefined || value === null || value === '') return null;
-    let displayValue: React.ReactNode = value;
+    
+    let displayValueNode: React.ReactNode; 
+
     if (value instanceof Date) {
-      displayValue = format(value, "PPP p");
+      displayValueNode = format(value, "PPP p"); 
+    } else {
+      displayValueNode = value; 
     }
     
     return (
       <div className={className}>
         <p className="text-sm text-muted-foreground">{label}</p>
-        <p className="font-medium">{displayValue}</p>
+        <p className="font-medium">{displayValueNode}</p>
       </div>
     );
   };
