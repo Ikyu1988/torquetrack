@@ -4,11 +4,11 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import type { JobOrder, Customer, Motorcycle, Mechanic, Payment, ShopSettings } from "@/types";
+import type { JobOrder, Customer, Motorcycle, Mechanic, Payment, ShopSettings, JobOrderServiceItem } from "@/types";
 import { ArrowLeft, ClipboardList, Edit, Printer, Send, UserCog, PackageSearch, Wrench, CreditCard, PlusCircle } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useState, useMemo, useCallback } from "react";
+import React, { useEffect, useState, useMemo, useCallback } from "react";
 import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -127,21 +127,30 @@ export default function ViewJobOrderPage() {
 
   const DetailItem = ({ label, value, className, isBadge = false, badgeVariant = "secondary" }: { label: string, value?: string | number | Date | null | React.ReactNode, className?: string, isBadge?: boolean, badgeVariant?: "default" | "secondary" | "destructive" | "outline" | null | undefined }) => {
     if (value === undefined || value === null || value === '') return null;
-    let displayValue = value;
+    
+    let renderableValue: React.ReactNode;
+
     if (value instanceof Date) {
-      displayValue = format(value, "PPP p");
+      renderableValue = format(value, "PPP p");
     } else if (typeof value === 'number' && (label.toLowerCase().includes('cost') || label.toLowerCase().includes('total') || label.toLowerCase().includes('amount') || label.toLowerCase().includes('balance')) ) {
-      displayValue = `${currency}${value.toFixed(2)}`;
+      renderableValue = `${currency}${value.toFixed(2)}`;
+    } else if (React.isValidElement(value) || typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+      renderableValue = value;
+    } else {
+      renderableValue = String(value); // Fallback for other types
     }
 
-    if (isBadge && typeof displayValue === 'string') {
-        displayValue = <Badge variant={badgeVariant}>{displayValue}</Badge>;
+    if (isBadge && typeof renderableValue === 'string') {
+        renderableValue = <Badge variant={badgeVariant}>{renderableValue}</Badge>;
     }
 
     return (
       <div className={cn("mb-2 print:mb-1", className)}>
         <p className="text-sm text-muted-foreground print:text-xs">{label}</p>
-        {typeof displayValue === 'string' ? <p className="font-medium print:text-sm">{displayValue}</p> : displayValue}
+        {typeof renderableValue === 'string' || typeof renderableValue === 'number'
+          ? <p className="font-medium print:text-sm">{renderableValue}</p>
+          : renderableValue
+        }
       </div>
     );
   };
@@ -263,7 +272,7 @@ export default function ViewJobOrderPage() {
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {jobOrder.servicesPerformed.map((item) => (
+                        {jobOrder.servicesPerformed.map((item: JobOrderServiceItem) => (
                         <TableRow key={item.id}>
                             <TableCell>{item.serviceName}</TableCell>
                             <TableCell>{item.assignedMechanicId ? mechanicsMap.get(item.assignedMechanicId) || 'N/A' : 'N/A'}</TableCell>
