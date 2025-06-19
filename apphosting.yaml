@@ -2,6 +2,27 @@
 # https://firebase.google.com/docs/app-hosting/configure
 
 runConfig:
+  # Default CPU. Adjust as needed. Common values: 1, 2, 4
+  cpu: 1
+  # Default memory in MiB. Adjust as needed. Common values: 512, 1024, 2048
+  memoryMiB: 512
   # Increase this value if you'd like to automatically spin up
   # more instances in response to increased traffic.
   maxInstances: 1
+env:
+  - variable: NODE_ENV
+    value: production
+    availability:
+      - BUILD
+      - RUNTIME
+  # Add other environment variables here as needed
+  # Example:
+  # - variable: MY_API_KEY
+  #   value: "your_api_key_here" # For build-time only values
+  #   availability:
+  #     - BUILD
+  # - variable: NEXT_PUBLIC_SOME_VAR # For vars accessible in browser
+  #   value: "some_public_value"
+  #   availability:
+  #     - BUILD
+  #     - RUNTIME
