@@ -21,7 +21,7 @@ import Link from "next/link";
 import { ArrowLeft, ArchiveRestore, PlusCircle, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter, useSearchParams } from "next/navigation";
-import type { GoodsReceipt, GoodsReceiptItem, PurchaseOrder, Part, ShopSettings, Supplier } from "@/types";
+import type { GoodsReceipt, GoodsReceiptItem, PurchaseOrder, Part, ShopSettings, Supplier, PurchaseOrderItem } from "@/types";
 import { useEffect, useState, useMemo, useCallback } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
@@ -93,7 +93,7 @@ export default function NewGoodsReceiptPage() {
         const supplier = (window as any).__supplierStore?.getSupplierById(po.supplierId);
         form.setValue("supplierName", supplier?.name || "Unknown Supplier");
 
-        const grItems: GoodsReceiptItem[] = po.items.map(poItem => ({
+        const grItems: GoodsReceiptItem[] = po.items.map((poItem: PurchaseOrderItem) => ({
           id: poItem.id, // Use PO item ID as base
           purchaseOrderItemId: poItem.id,
           partId: poItem.partId,
@@ -379,3 +379,4 @@ export default function NewGoodsReceiptPage() {
     </div>
   );
 }
+
