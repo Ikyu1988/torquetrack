@@ -32,30 +32,27 @@ const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "AIzaSyAUdpkhWz2NjWXsn5KamJyYzArVp7szA5Q",
   authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || "torquetrack-ts3ph.firebaseapp.com",
   projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "torquetrack-ts3ph",
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || "torquetrack-ts3ph.firebasestorage.app",
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || "torquetrack-ts3ph.appspot.com", // Corrected placeholder
   messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || "572902936608",
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID || "1:572902936608:web:fd25063f0707df5e68ec45",
   // measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID // Optional
 };
 
-// Define default placeholder values (these should match the fallbacks in firebaseConfig)
+// Define default placeholder values for a more robust check
 const DEFAULT_PLACEHOLDER_API_KEY = "AIzaSyAUdpkhWz2NjWXsn5KamJyYzArVp7szA5Q";
 const DEFAULT_PLACEHOLDER_AUTH_DOMAIN = "torquetrack-ts3ph.firebaseapp.com";
 const DEFAULT_PLACEHOLDER_PROJECT_ID = "torquetrack-ts3ph";
-// Add other critical placeholders if necessary
-const DEFAULT_PLACEHOLDER_STORAGE_BUCKET = "torquetrack-ts3ph.firebasestorage.app";
+const DEFAULT_PLACEHOLDER_STORAGE_BUCKET = "torquetrack-ts3ph.appspot.com"; // Ensure this matches the corrected one above
 const DEFAULT_PLACEHOLDER_MESSAGING_SENDER_ID = "572902936608";
 const DEFAULT_PLACEHOLDER_APP_ID = "1:572902936608:web:fd25063f0707df5e68ec45";
-
 
 const IS_PLACEHOLDER_CONFIG =
   !firebaseConfig.apiKey || firebaseConfig.apiKey.startsWith("YOUR_") || firebaseConfig.apiKey === DEFAULT_PLACEHOLDER_API_KEY ||
   !firebaseConfig.authDomain || firebaseConfig.authDomain.startsWith("YOUR_") || firebaseConfig.authDomain === DEFAULT_PLACEHOLDER_AUTH_DOMAIN ||
   !firebaseConfig.projectId || firebaseConfig.projectId.startsWith("YOUR_") || firebaseConfig.projectId === DEFAULT_PLACEHOLDER_PROJECT_ID ||
-  // Adding checks for other default placeholders to be thorough
-  firebaseConfig.storageBucket === DEFAULT_PLACEHOLDER_STORAGE_BUCKET ||
-  firebaseConfig.messagingSenderId === DEFAULT_PLACEHOLDER_MESSAGING_SENDER_ID ||
-  firebaseConfig.appId === DEFAULT_PLACEHOLDER_APP_ID;
+  !firebaseConfig.storageBucket || firebaseConfig.storageBucket.startsWith("YOUR_") || firebaseConfig.storageBucket === DEFAULT_PLACEHOLDER_STORAGE_BUCKET ||
+  !firebaseConfig.messagingSenderId || firebaseConfig.messagingSenderId.startsWith("YOUR_") || firebaseConfig.messagingSenderId === DEFAULT_PLACEHOLDER_MESSAGING_SENDER_ID ||
+  !firebaseConfig.appId || firebaseConfig.appId.startsWith("YOUR_") || firebaseConfig.appId === DEFAULT_PLACEHOLDER_APP_ID;
 
 
 let app: FirebaseApp;
@@ -109,3 +106,4 @@ if (typeof window !== 'undefined') { // Ensure Firebase is initialized only on t
 
 
 export { app, auth /*, db, storage */ };
+
