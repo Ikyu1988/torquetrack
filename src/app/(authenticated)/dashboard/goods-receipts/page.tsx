@@ -15,7 +15,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
-import type { GoodsReceipt, PurchaseOrder, Supplier, ShopSettings, GoodsReceiptStatus } from "@/types"; // Added GoodsReceiptStatus
+import type { GoodsReceipt, PurchaseOrder, Supplier, ShopSettings, GoodsReceiptStatus, GoodsReceiptItem } from "@/types";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { GOODS_RECEIPT_STATUSES, GOODS_RECEIPT_STATUS_OPTIONS } from "@/lib/constants";
@@ -41,7 +41,7 @@ if (typeof window !== 'undefined') {
         (window as any).__goodsReceiptStore.goodsReceipts.push(newReceipt);
 
         if ((window as any).__inventoryStore && newReceipt.status === GOODS_RECEIPT_STATUSES.COMPLETED) {
-          newReceipt.items.forEach(item => {
+          newReceipt.items.forEach((item: GoodsReceiptItem) => {
             const part = (window as any).__inventoryStore.getPartById(item.partId);
             if (part) {
               part.stockQuantity += item.quantityReceived;
@@ -59,7 +59,7 @@ if (typeof window !== 'undefined') {
           
           if (oldReceipt.status !== GOODS_RECEIPT_STATUSES.COMPLETED && updatedReceipt.status === GOODS_RECEIPT_STATUSES.COMPLETED) {
              if ((window as any).__inventoryStore) {
-                updatedReceipt.items.forEach(item => {
+                updatedReceipt.items.forEach((item: GoodsReceiptItem) => {
                     const part = (window as any).__inventoryStore.getPartById(item.partId);
                     if (part) {
                     part.stockQuantity += item.quantityReceived; 
@@ -225,7 +225,7 @@ export default function GoodsReceiptsPage() {
                     <TableCell>{supplierMap.get(gr.supplierId) || "N/A"}</TableCell>
                     <TableCell><Badge variant={gr.status === GOODS_RECEIPT_STATUSES.COMPLETED ? "default" : "secondary"}>{gr.status}</Badge></TableCell>
                     <TableCell>{format(new Date(gr.receivedDate), "MMM dd, yyyy")}</TableCell>
-                    <TableCell>{gr.items.reduce((sum, item) => sum + item.quantityReceived, 0)}</TableCell>
+                    <TableCell>{gr.items.reduce((sum, item: GoodsReceiptItem) => sum + item.quantityReceived, 0)}</TableCell>
                     <TableCell className="text-right space-x-1">
                       <Button variant="ghost" size="icon" asChild className="hover:text-primary">
                         <Link href={`/dashboard/goods-receipts/${gr.id}`}>

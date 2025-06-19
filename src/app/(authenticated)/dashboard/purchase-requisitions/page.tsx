@@ -25,7 +25,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
-import type { PurchaseRequisition, ShopSettings, PurchaseRequisitionStatus } from "@/types";
+import type { PurchaseRequisition, ShopSettings, PurchaseRequisitionStatus, PurchaseRequisitionItem } from "@/types";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { PURCHASE_REQUISITION_STATUSES, PURCHASE_REQUISITION_STATUS_OPTIONS } from "@/lib/constants";
@@ -66,7 +66,7 @@ if (typeof window !== 'undefined') {
     (window as any).__purchaseRequisitionStore = {
       requisitions: [...initialRequisitions],
       addRequisition: (requisition: Omit<PurchaseRequisition, 'id' | 'createdAt' | 'updatedAt' | 'totalEstimatedValue' | 'submittedDate'>) => {
-        const totalValue = requisition.items.reduce((sum, item) => sum + (item.quantity * (item.estimatedPricePerUnit || 0)), 0);
+        const totalValue = requisition.items.reduce((sum, item: PurchaseRequisitionItem) => sum + (item.quantity * (item.estimatedPricePerUnit || 0)), 0);
         const newRequisition: PurchaseRequisition = {
           ...requisition,
           id: String(Date.now() + Math.random()),
@@ -81,7 +81,7 @@ if (typeof window !== 'undefined') {
       updateRequisition: (updatedRequisition: PurchaseRequisition) => {
         const index = (window as any).__purchaseRequisitionStore.requisitions.findIndex((r: PurchaseRequisition) => r.id === updatedRequisition.id);
         if (index !== -1) {
-          const totalValue = updatedRequisition.items.reduce((sum, item) => sum + (item.quantity * (item.estimatedPricePerUnit || 0)), 0);
+          const totalValue = updatedRequisition.items.reduce((sum, item: PurchaseRequisitionItem) => sum + (item.quantity * (item.estimatedPricePerUnit || 0)), 0);
           (window as any).__purchaseRequisitionStore.requisitions[index] = { 
             ...updatedRequisition, 
             totalEstimatedValue: totalValue,
@@ -191,7 +191,7 @@ export default function PurchaseRequisitionsPage() {
         req.id.toLowerCase().includes(lowerSearchTerm) ||
         (req.requestedByUserId && req.requestedByUserId.toLowerCase().includes(lowerSearchTerm)) ||
         (req.department && req.department.toLowerCase().includes(lowerSearchTerm)) ||
-        req.items.some(item => item.description.toLowerCase().includes(lowerSearchTerm) || (item.partName && item.partName.toLowerCase().includes(lowerSearchTerm)))
+        req.items.some((item: PurchaseRequisitionItem) => item.description.toLowerCase().includes(lowerSearchTerm) || (item.partName && item.partName.toLowerCase().includes(lowerSearchTerm)))
       );
     }
     return filtered;

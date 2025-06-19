@@ -19,7 +19,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { ShoppingCart, PlusCircle, Trash2, Printer, Eye, ClipboardList } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
-import type { SalesOrder, Customer, Part, PaymentMethod, ShopSettings, Payment } from "@/types";
+import type { SalesOrder, Customer, Part, PaymentMethod, ShopSettings, Payment, SalesOrderItem } from "@/types";
 import { useEffect, useState, useMemo, useCallback } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SALES_ORDER_STATUSES, PAYMENT_STATUSES, PAYMENT_METHOD_OPTIONS } from "@/lib/constants";
@@ -64,7 +64,7 @@ if (typeof window !== 'undefined') {
       salesOrders: [],
       addSalesOrder: (orderData: Omit<SalesOrder, 'id' | 'createdAt' | 'updatedAt' | 'grandTotal' | 'amountPaid' | 'paymentHistory' | 'customerName'> & { initialPaymentMethod?: PaymentMethod; initialPaymentNotes?: string; taxAmount?: number }) => {
         const customer = orderData.customerId && orderData.customerId !== WALK_IN_CUSTOMER_IDENTIFIER && (window as any).__customerStore ? (window as any).__customerStore.getCustomerById(orderData.customerId) : null;
-        const totalItems = orderData.items.reduce((sum, item) => sum + item.totalPrice, 0);
+        const totalItems = orderData.items.reduce((sum, item: SalesOrderItem) => sum + item.totalPrice, 0);
         const discount = Number(orderData.discountAmount) || 0;
         
         let taxRateValue = 0;
@@ -79,14 +79,14 @@ if (typeof window !== 'undefined') {
           ...orderData,
           id: String(Date.now() + Math.random()),
           customerName: customer ? `${customer.firstName} ${customer.lastName}` : "Walk-in Customer",
-          items: orderData.items.map(item => ({ ...item })),
+          items: orderData.items.map((item: SalesOrderItem) => ({ ...item })),
           taxAmount: calculatedTaxAmount,
           grandTotal,
           amountPaid: orderData.paymentStatus === PAYMENT_STATUSES.PAID ? grandTotal : 0,
           paymentHistory: [],
           createdAt: new Date(),
           updatedAt: new Date(),
-          // createdByUserId: "current_user_placeholder", // This was already in the store
+          createdByUserId: "current_user_placeholder",
         };
 
         if (newSalesOrder.paymentStatus === PAYMENT_STATUSES.PAID && newSalesOrder.amountPaid > 0) {
@@ -110,7 +110,7 @@ if (typeof window !== 'undefined') {
         (window as any).__salesOrderStore.salesOrders.push(newSalesOrder);
 
         if ((window as any).__inventoryStore) {
-          newSalesOrder.items.forEach(item => {
+          newSalesOrder.items.forEach((item: SalesOrderItem) => {
             const part = (window as any).__inventoryStore.getPartById(item.partId);
             if (part) {
               part.stockQuantity -= item.quantity;
@@ -257,14 +257,14 @@ export default function DirectSalesPage() {
         const saleOrderData: Omit<SalesOrder, 'id' | 'createdAt' | 'updatedAt' | 'grandTotal' | 'amountPaid' | 'paymentHistory' | 'customerName'> & { initialPaymentMethod?: PaymentMethod; initialPaymentNotes?: string; taxAmount?: number } = {
             customerId: data.customerId === WALK_IN_CUSTOMER_IDENTIFIER ? undefined : data.customerId,
             status: data.status,
-            items: data.items.map(p => ({...p})), 
+            items: data.items.map((p: SalesOrderItem) => ({...p})), 
             discountAmount: data.discountAmount === '' ? undefined : Number(data.discountAmount),
             paymentStatus: PAYMENT_STATUSES.PAID, 
             initialPaymentMethod: data.paymentMethod, 
             initialPaymentNotes: data.paymentNotes || `Payment for direct sale`,
             taxAmount: calculatedTaxAmountForDisplay,
             notes: "Direct Parts Sale",
-            createdByUserId: "current_user_placeholder", // Added missing property
+            createdByUserId: "current_user_placeholder",
         };
       
       try {
@@ -608,3 +608,4 @@ export default function DirectSalesPage() {
     </div>
   );
 }
+

@@ -25,7 +25,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
-import type { PurchaseOrder, Supplier, ShopSettings, PurchaseOrderStatus } from "@/types";
+import type { PurchaseOrder, Supplier, ShopSettings, PurchaseOrderStatus, PurchaseOrderItem } from "@/types";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { PURCHASE_ORDER_STATUSES, PURCHASE_ORDER_STATUS_OPTIONS, PURCHASE_REQUISITION_STATUSES } from "@/lib/constants";
@@ -57,8 +57,8 @@ if (typeof window !== 'undefined') {
     (window as any).__purchaseOrderStore = {
       purchaseOrders: [...initialPurchaseOrders],
       addPurchaseOrder: (poData: Omit<PurchaseOrder, 'id' | 'createdAt' | 'updatedAt' | 'subTotal' | 'grandTotal' >) => {
-        const subTotal = poData.items.reduce((sum, item) => sum + item.totalPrice, 0);
-        const taxAmount = poData.taxAmount !== undefined ? poData.taxAmount : (subTotal * 0.10);
+        const subTotal = poData.items.reduce((sum, item: PurchaseOrderItem) => sum + item.totalPrice, 0);
+        const taxAmount = poData.taxAmount !== undefined ? poData.taxAmount : (subTotal * 0.10); // Example tax
         const grandTotal = subTotal + taxAmount + (poData.shippingCost || 0);
 
         const newPurchaseOrder: PurchaseOrder = {
@@ -74,7 +74,7 @@ if (typeof window !== 'undefined') {
         if (newPurchaseOrder.purchaseRequisitionId && (window as any).__purchaseRequisitionStore) {
             const req = (window as any).__purchaseRequisitionStore.getRequisitionById(newPurchaseOrder.purchaseRequisitionId);
             if (req) {
-                req.status = PURCHASE_REQUISITION_STATUSES.ORDERED as any; // Cast needed due to type mismatch if not directly using string
+                req.status = PURCHASE_REQUISITION_STATUSES.ORDERED as any; 
                 (window as any).__purchaseRequisitionStore.updateRequisition(req);
             }
         }
@@ -83,8 +83,8 @@ if (typeof window !== 'undefined') {
       updatePurchaseOrder: (updatedPO: PurchaseOrder) => {
         const index = (window as any).__purchaseOrderStore.purchaseOrders.findIndex((po: PurchaseOrder) => po.id === updatedPO.id);
         if (index !== -1) {
-           const subTotal = updatedPO.items.reduce((sum, item) => sum + item.totalPrice, 0);
-           const taxAmount = updatedPO.taxAmount !== undefined ? updatedPO.taxAmount : (subTotal * 0.10);
+           const subTotal = updatedPO.items.reduce((sum, item: PurchaseOrderItem) => sum + item.totalPrice, 0);
+           const taxAmount = updatedPO.taxAmount !== undefined ? updatedPO.taxAmount : (subTotal * 0.10); // Example tax
            const grandTotal = subTotal + taxAmount + (updatedPO.shippingCost || 0);
 
           (window as any).__purchaseOrderStore.purchaseOrders[index] = {
