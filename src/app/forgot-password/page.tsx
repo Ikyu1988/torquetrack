@@ -7,7 +7,7 @@ import * as z from "zod";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label"; // Replaced by FormLabel, but kept for now if direct use remains
+// import { Label } from "@/components/ui/label"; // Unused import removed
 import Link from "next/link";
 import { ArrowLeft, KeyRound } from "lucide-react";
 import { AppLogo } from "@/components/layout/AppLogo";
