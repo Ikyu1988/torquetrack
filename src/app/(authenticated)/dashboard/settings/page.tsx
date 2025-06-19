@@ -38,7 +38,7 @@ const settingsFormSchema = z.object({
   shopPhone: z.string().max(30).optional().or(z.literal('')),
   shopEmail: z.string().email("Invalid email address.").max(100).optional().or(z.literal('')),
   shopLogoUrl: z.string().url("Invalid URL format for logo.").max(255).optional().or(z.literal('')),
-  
+
   currencySymbol: z.string().min(1, "Currency symbol is required.").max(5),
   currencyCode: z.string().min(3, "Currency code (e.g. PHP, USD) is required.").max(5).optional().or(z.literal('')),
   defaultTaxRate: z.preprocess(
@@ -62,11 +62,11 @@ const initialSettings: ShopSettings = {
   shopPhone: "0917-123-4567",
   shopEmail: "contact@torquetrack.ph",
   shopLogoUrl: "",
-  currencySymbol: "₱", 
+  currencySymbol: "₱",
   currencyCode: "PHP",
-  defaultTaxRate: 12, 
-  defaultLaborRate: 500, 
-  theme: 'dark', 
+  defaultTaxRate: 12,
+  defaultLaborRate: 500,
+  theme: 'dark',
   moduleSettings: {
     reportsEnabled: true,
     directSalesEnabled: true,
@@ -84,7 +84,7 @@ if (typeof window !== 'undefined') {
         (window as any).__settingsStore.settings = {
           ...(window as any).__settingsStore.settings,
           ...newSettings,
-          moduleSettings: { 
+          moduleSettings: {
             ...(window as any).__settingsStore.settings.moduleSettings,
             ...newSettings.moduleSettings,
           },
@@ -109,7 +109,7 @@ export default function SettingsPage() {
       shopPhone: "",
       shopEmail: "",
       shopLogoUrl: "",
-      currencySymbol: "₱", 
+      currencySymbol: "₱",
       currencyCode: "PHP",
       defaultTaxRate: undefined,
       defaultLaborRate: undefined,
@@ -148,7 +148,7 @@ export default function SettingsPage() {
       if (typeof window !== 'undefined' && (window as any).__settingsStore) {
         currentSettings = (window as any).__settingsStore.getSettings();
       }
-      
+
       const storedTheme = localStorage.getItem('theme') as 'light' | 'dark' | null;
       const themeToUse = storedTheme || currentSettings?.theme || initialSettings.theme;
 
@@ -170,7 +170,7 @@ export default function SettingsPage() {
             purchaseOrdersEnabled: currentSettings.moduleSettings?.purchaseOrdersEnabled ?? true,
           },
         });
-      } else { 
+      } else {
          form.reset({
           ...initialSettings,
           defaultTaxRate: initialSettings.defaultTaxRate === undefined ? undefined : initialSettings.defaultTaxRate,
@@ -202,7 +202,7 @@ export default function SettingsPage() {
     }
 
     if (updatedSettings) {
-      applyTheme(updatedSettings.theme); 
+      applyTheme(updatedSettings.theme);
       toast({
         title: "Settings Saved",
         description: "Your shop settings have been successfully updated.",
@@ -235,7 +235,7 @@ export default function SettingsPage() {
         <CardContent>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-10">
-              
+
               <Card className="shadow-md">
                 <CardHeader>
                     <div className="flex items-center gap-3">
@@ -363,13 +363,13 @@ export default function SettingsPage() {
                         <FormItem>
                           <FormLabel>Default Tax Rate (%) (Optional)</FormLabel>
                           <FormControl>
-                            <Input 
-                              type="number" 
-                              step="0.01" 
-                              placeholder="e.g., 12" 
-                              {...field} 
+                            <Input
+                              type="number"
+                              step="0.01"
+                              placeholder="e.g., 12"
+                              {...field}
                               onChange={e => field.onChange(e.target.value === '' ? undefined : parseFloat(e.target.value))}
-                              value={field.value ?? ''} 
+                              value={field.value ?? ''}
                             />
                           </FormControl>
                           <FormMessage />
@@ -383,12 +383,12 @@ export default function SettingsPage() {
                         <FormItem>
                           <FormLabel>Default Labor Rate ({form.getValues("currencySymbol") || '₱'}/hr) (Optional)</FormLabel>
                           <FormControl>
-                            <Input 
-                              type="number" 
-                              step="0.01" 
-                              placeholder="e.g., 500" 
-                              {...field} 
-                              onChange={e => field.onChange(e.target.value === '' ? undefined : parseFloat(e.target.value))} 
+                            <Input
+                              type="number"
+                              step="0.01"
+                              placeholder="e.g., 500"
+                              {...field}
+                              onChange={e => field.onChange(e.target.value === '' ? undefined : parseFloat(e.target.value))}
                               value={field.value ?? ''}
                             />
                           </FormControl>
@@ -511,7 +511,7 @@ export default function SettingsPage() {
                     </div>
                 </CardContent>
               </Card>
-              
+
               <div className="flex justify-end pt-4">
                 <Button type="submit" disabled={form.formState.isSubmitting} size="lg">
                   {form.formState.isSubmitting ? "Saving..." : "Save Settings"}

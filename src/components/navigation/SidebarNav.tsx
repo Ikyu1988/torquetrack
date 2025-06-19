@@ -3,14 +3,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { 
-  LayoutDashboard, 
-  Wrench, 
-  Users, 
-  Bike, 
-  Package, 
-  ClipboardList, 
-  FileText, 
+import {
+  LayoutDashboard,
+  Wrench,
+  Users,
+  Bike,
+  Package,
+  ClipboardList,
+  FileText,
   Settings,
   UserCog,
   ShoppingCart,
@@ -56,7 +56,7 @@ export function SidebarNav({ collapsed }: { collapsed?: boolean }) {
       </div>
       <ScrollArea className="flex-1">
         <nav className={cn("flex flex-col gap-1 p-2", collapsed ? "items-center" : "")}>
-          {navItems.map((item, index) => 
+          {navItems.map((item, index) =>
             item.type === "separator" ? (
               <Separator key={`sep-${index}`} className={cn("my-2", collapsed ? "w-12" : "")} />
             ) : (
