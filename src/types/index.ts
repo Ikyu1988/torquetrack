@@ -1,10 +1,8 @@
 
+import type { UserRole, JobOrderStatus, PaymentStatus, CommissionType, PaymentMethod as ImportedPaymentMethod, PurchaseRequisitionStatus, PurchaseOrderStatus, /* GoodsReceiptStatus removed from this aliased import */ SalesOrderStatus } from '@/lib/constants';
+export type { GoodsReceiptStatus } from '@/lib/constants'; // Direct re-export for GoodsReceiptStatus
 
-
-import type { UserRole, JobOrderStatus, PaymentStatus, CommissionType, PaymentMethod as ImportedPaymentMethod, PurchaseRequisitionStatus, PurchaseOrderStatus, GoodsReceiptStatus as ImportedGoodsReceiptStatus, SalesOrderStatus } from '@/lib/constants';
-
-export type PaymentMethod = ImportedPaymentMethod; // Explicitly re-export the type
-export type GoodsReceiptStatus = ImportedGoodsReceiptStatus; // Explicitly re-export the type
+export type PaymentMethod = ImportedPaymentMethod; // Explicitly re-export the type for PaymentMethod
 
 export interface User {
   id: string;
@@ -283,10 +281,9 @@ export interface GoodsReceipt {
   receivedDate: Date;
   receivedByUserId: string;
   items: GoodsReceiptItem[];
-  status: GoodsReceiptStatus;
+  status: GoodsReceiptStatus; // This uses the directly re-exported type
   notes?: string; // e.g., "Partial delivery", "All items received in good condition"
   discrepancies?: string; // Notes on any issues
   createdAt: Date;
   updatedAt: Date;
 }
-
