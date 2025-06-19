@@ -16,11 +16,17 @@ export const JOB_ORDER_STATUSES = {
   READY_FOR_PICKUP: 'Ready for Pickup',
   COMPLETED: 'Completed',
   CANCELLED: 'Cancelled',
-  // SALE_COMPLETED: 'Sale - Completed', // Removed: Sales Orders are now separate
 } as const;
 
 export type JobOrderStatus = typeof JOB_ORDER_STATUSES[keyof typeof JOB_ORDER_STATUSES];
-export const JOB_ORDER_STATUS_OPTIONS = Object.values(JOB_ORDER_STATUSES);
+export const JOB_ORDER_STATUS_OPTIONS = [
+  JOB_ORDER_STATUSES.PENDING,
+  JOB_ORDER_STATUSES.IN_PROGRESS,
+  JOB_ORDER_STATUSES.AWAITING_PARTS,
+  JOB_ORDER_STATUSES.READY_FOR_PICKUP,
+  JOB_ORDER_STATUSES.COMPLETED,
+  JOB_ORDER_STATUSES.CANCELLED,
+] as const;
 
 export const SALES_ORDER_STATUSES = {
   DRAFT: 'Draft',
@@ -39,7 +45,12 @@ export const PAYMENT_STATUSES = {
 } as const;
 
 export type PaymentStatus = typeof PAYMENT_STATUSES[keyof typeof PAYMENT_STATUSES];
-export const PAYMENT_STATUS_OPTIONS = Object.values(PAYMENT_STATUSES);
+export const PAYMENT_STATUS_OPTIONS = [
+  PAYMENT_STATUSES.PAID,
+  PAYMENT_STATUSES.PARTIAL,
+  PAYMENT_STATUSES.UNPAID,
+  PAYMENT_STATUSES.REFUNDED,
+] as const;
 
 export const COMMISSION_TYPES = {
   FIXED: 'Fixed',
@@ -47,7 +58,10 @@ export const COMMISSION_TYPES = {
 } as const;
 
 export type CommissionType = typeof COMMISSION_TYPES[keyof typeof COMMISSION_TYPES];
-export const COMMISSION_TYPE_OPTIONS = Object.values(COMMISSION_TYPES);
+export const COMMISSION_TYPE_OPTIONS = [
+  COMMISSION_TYPES.FIXED,
+  COMMISSION_TYPES.PERCENTAGE,
+] as const;
 
 export const PAYMENT_METHODS = {
   CASH: 'Cash',
@@ -58,7 +72,13 @@ export const PAYMENT_METHODS = {
 } as const;
 
 export type PaymentMethod = typeof PAYMENT_METHODS[keyof typeof PAYMENT_METHODS];
-export const PAYMENT_METHOD_OPTIONS = Object.values(PAYMENT_METHODS);
+export const PAYMENT_METHOD_OPTIONS = [
+  PAYMENT_METHODS.CASH,
+  PAYMENT_METHODS.CREDIT_CARD,
+  PAYMENT_METHODS.DEBIT_CARD,
+  PAYMENT_METHODS.BANK_TRANSFER,
+  PAYMENT_METHODS.OTHER,
+] as const;
 
 
 // --- Purchase Order Management ---
@@ -95,5 +115,10 @@ export const GOODS_RECEIPT_STATUSES = {
   CANCELLED: 'Cancelled',
 } as const;
 export type GoodsReceiptStatus = typeof GOODS_RECEIPT_STATUSES[keyof typeof GOODS_RECEIPT_STATUSES];
-export const GOODS_RECEIPT_STATUS_OPTIONS = Object.values(GOODS_RECEIPT_STATUSES);
+export const GOODS_RECEIPT_STATUS_OPTIONS = [
+  GOODS_RECEIPT_STATUSES.PENDING,
+  GOODS_RECEIPT_STATUSES.COMPLETED,
+  GOODS_RECEIPT_STATUSES.PARTIAL,
+  GOODS_RECEIPT_STATUSES.CANCELLED,
+] as const;
 
