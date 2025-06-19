@@ -1,6 +1,8 @@
 
 
-import type { UserRole, JobOrderStatus, PaymentStatus, CommissionType, PaymentMethod, PurchaseRequisitionStatus, PurchaseOrderStatus, GoodsReceiptStatus, SalesOrderStatus } from '@/lib/constants';
+import type { UserRole, JobOrderStatus, PaymentStatus, CommissionType, PaymentMethod as ImportedPaymentMethod, PurchaseRequisitionStatus, PurchaseOrderStatus, GoodsReceiptStatus, SalesOrderStatus } from '@/lib/constants';
+
+export type PaymentMethod = ImportedPaymentMethod; // Explicitly re-export the type
 
 export interface User {
   id: string;
@@ -101,32 +103,32 @@ export interface Payment {
 
 export interface JobOrder {
   id: string;
-  customerId: string; 
-  motorcycleId: string; 
+  customerId: string;
+  motorcycleId: string;
   status: JobOrderStatus;
-  
-  servicesPerformed: JobOrderServiceItem[]; 
-  partsUsed: JobOrderPartItem[];          
 
-  servicesDescription?: string; 
-  partsDescription?: string;    
+  servicesPerformed: JobOrderServiceItem[];
+  partsUsed: JobOrderPartItem[];
 
-  diagnostics?: string; 
-  images?: string[]; 
-  estimatedCompletionDate?: Date; 
+  servicesDescription?: string;
+  partsDescription?: string;
+
+  diagnostics?: string;
+  images?: string[];
+  estimatedCompletionDate?: Date;
   actualCompletionDate?: Date;
-  
+
   discountAmount?: number;
-  taxAmount?: number; 
+  taxAmount?: number;
   grandTotal: number;
-  
+
   paymentStatus: PaymentStatus;
-  amountPaid: number; 
-  paymentHistory: Payment[]; 
+  amountPaid: number;
+  paymentHistory: Payment[];
 
   createdAt: Date;
   updatedAt: Date;
-  createdByUserId: string; 
+  createdByUserId: string;
 }
 
 export interface SalesOrderItem {
@@ -179,7 +181,7 @@ export interface ShopSettings {
   shopPhone?: string;
   shopEmail?: string;
   shopLogoUrl?: string; // URL to the logo, actual upload not handled
-  currencySymbol: string; 
+  currencySymbol: string;
   currencyCode?: string; // e.g. PHP, USD
   defaultTaxRate?: number; // as a percentage, e.g., 10 for 10%
   defaultLaborRate?: number; // Default hourly labor rate for the shop
