@@ -1,7 +1,7 @@
 // src/app/(authenticated)/layout.tsx
 "use client"; 
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { AppHeader } from "@/components/layout/AppHeader";
 import { SidebarNav } from "@/components/navigation/SidebarNav";
 import { cn } from "@/lib/utils";
@@ -33,7 +33,7 @@ export default function AuthenticatedLayout({
     }
   }, [user, loading, router, isMounted]);
 
-  const toggleSidebar = () => {
+  const toggleSidebar = useCallback(() => {
     setIsSidebarCollapsed(prev => {
       const newState = !prev;
       if (typeof window !== 'undefined') {
@@ -41,7 +41,7 @@ export default function AuthenticatedLayout({
       }
       return newState;
     });
-  };
+  }, [setIsSidebarCollapsed]); // setIsSidebarCollapsed is stable
 
   if (!isMounted || loading || !user) {
     // Show a full-page loading skeleton or spinner
@@ -78,3 +78,4 @@ export default function AuthenticatedLayout({
     </div>
   );
 }
+
