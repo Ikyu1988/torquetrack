@@ -25,7 +25,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
-import type { JobOrder, Customer, Motorcycle, Part, Service, Payment, PaymentMethod, ShopSettings, JobOrderStatus } from "@/types";
+import type { JobOrder, Customer, Motorcycle, Part, Service, Payment, PaymentMethod, ShopSettings, JobOrderStatus, JobOrderPartItem } from "@/types";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { PAYMENT_STATUSES, JOB_ORDER_STATUSES, JOB_ORDER_STATUS_OPTIONS } from "@/lib/constants";
@@ -149,7 +149,7 @@ if (typeof window !== 'undefined') {
         (window as any).__jobOrderStore.jobOrders.push(newJobOrder);
 
         if ((window as any).__inventoryStore) {
-          newJobOrder.partsUsed.forEach(item => {
+          newJobOrder.partsUsed.forEach((item: JobOrderPartItem) => {
             const partIndex = (window as any).__inventoryStore.parts.findIndex((p: Part) => p.id === item.partId);
             if (partIndex !== -1) {
               (window as any).__inventoryStore.parts[partIndex].stockQuantity -= item.quantity;
@@ -162,7 +162,7 @@ if (typeof window !== 'undefined') {
         const index = (window as any).__jobOrderStore.jobOrders.findIndex((jo: JobOrder) => jo.id === updatedJobOrder.id);
         if (index !== -1) {
           const oldJobOrder = { ...(window as any).__jobOrderStore.jobOrders[index] }; 
-          oldJobOrder.partsUsed = oldJobOrder.partsUsed.map(p => ({...p}));
+          oldJobOrder.partsUsed = oldJobOrder.partsUsed.map((p: JobOrderPartItem) => ({...p}));
 
           const totalLabor = updatedJobOrder.servicesPerformed.reduce((sum, s) => sum + s.laborCost, 0);
           const totalParts = updatedJobOrder.partsUsed.reduce((sum, p) => sum + p.totalPrice, 0);
@@ -183,14 +183,14 @@ if (typeof window !== 'undefined') {
             };
           
           if ((window as any).__inventoryStore) {
-            oldJobOrder.partsUsed.forEach(oldItem => {
+            oldJobOrder.partsUsed.forEach((oldItem: JobOrderPartItem) => {
               const partIndex = (window as any).__inventoryStore.parts.findIndex((p: Part) => p.id === oldItem.partId);
               if (partIndex !== -1) {
                 (window as any).__inventoryStore.parts[partIndex].stockQuantity += oldItem.quantity;
               }
             });
 
-            updatedJobOrder.partsUsed.forEach(newItem => {
+            updatedJobOrder.partsUsed.forEach((newItem: JobOrderPartItem) => {
                 const partIndex = (window as any).__inventoryStore.parts.findIndex((p: Part) => p.id === newItem.partId);
                 if(partIndex !== -1) {
                     (window as any).__inventoryStore.parts[partIndex].stockQuantity -= newItem.quantity;
@@ -206,7 +206,7 @@ if (typeof window !== 'undefined') {
         if (jobOrderIndex !== -1) {
             const jobOrderToDelete = (window as any).__jobOrderStore.jobOrders[jobOrderIndex];
             if ((window as any).__inventoryStore && jobOrderToDelete.partsUsed) {
-                jobOrderToDelete.partsUsed.forEach(item => {
+                jobOrderToDelete.partsUsed.forEach((item: JobOrderPartItem) => {
                     const partIndex = (window as any).__inventoryStore.parts.findIndex((p: Part) => p.id === item.partId);
                     if (partIndex !== -1) {
                         (window as any).__inventoryStore.parts[partIndex].stockQuantity += item.quantity;
@@ -530,4 +530,5 @@ export default function JobOrdersPage() {
     </div>
   );
 }
+
 
