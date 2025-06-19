@@ -87,7 +87,7 @@ const initialParts: Part[] = [
     price: 18.00,
     cost: 9.00,
     supplier: "BikeParts Direct",
-    stockQuantity: 3, 
+    stockQuantity: 3,
     minStockAlert: 5,
     isActive: true,
     createdAt: new Date(),
@@ -102,7 +102,7 @@ const initialParts: Part[] = [
     price: 22.00,
     cost: 11.00,
     supplier: "MotoSupplies Inc.",
-    stockQuantity: 0, 
+    stockQuantity: 0,
     minStockAlert: 3,
     isActive: true,
     createdAt: new Date(),
@@ -117,7 +117,7 @@ if (typeof window !== 'undefined') {
       addPart: (part: Omit<Part, 'id' | 'createdAt' | 'updatedAt'>) => {
         const newPart: Part = {
           ...part,
-          id: String(Date.now() + Math.random()), 
+          id: String(Date.now() + Math.random()),
           createdAt: new Date(),
           updatedAt: new Date(),
         };
@@ -210,9 +210,9 @@ export default function InventoryPage() {
     const interval = setInterval(() => {
       refreshParts();
       refreshShopSettings();
-    }, 1000); 
+    }, 1000);
     return () => clearInterval(interval);
-  }, [isMounted, refreshParts, refreshShopSettings]); 
+  }, [isMounted, refreshParts, refreshShopSettings]);
 
   const handleDeletePart = (part: Part) => {
     setPartToDelete(part);
@@ -240,8 +240,8 @@ export default function InventoryPage() {
       return;
     }
     const headers = [
-      "id", "name", "brand", "category", "sku", "price", "cost", 
-      "supplier", "stockQuantity", "minStockAlert", "notes", "isActive", 
+      "id", "name", "brand", "category", "sku", "price", "cost",
+      "supplier", "stockQuantity", "minStockAlert", "notes", "isActive",
       "createdAt", "updatedAt"
     ];
     const csvRows = [
@@ -251,7 +251,7 @@ export default function InventoryPage() {
         if (value instanceof Date) {
           value = value.toISOString();
         } else if (typeof value === 'string' && value.includes(',')) {
-          value = `"${value}"`; 
+          value = `"${value}"`;
         } else if (value === undefined || value === null) {
           value = "";
         }
@@ -303,7 +303,7 @@ export default function InventoryPage() {
         'notes': { key: 'notes', type: 'string', optional: true },
         'isactive': { key: 'isActive', type: 'boolean' },
       };
-      
+
       const headerMap: { index: number, targetKey: keyof Omit<Part, 'id' | 'createdAt' | 'updatedAt'>, type: 'string' | 'number' | 'integer' | 'boolean', optional?: boolean }[] = [];
       headerLine.forEach((header, index) => {
         const mapping = expectedPartHeaders[header];
@@ -322,10 +322,10 @@ export default function InventoryPage() {
 
       for (let i = 1; i < lines.length; i++) {
         const line = lines[i];
-        if (!line.trim()) continue; 
+        if (!line.trim()) continue;
 
-        const values = line.split(','); 
-        
+        const values = line.split(',');
+
         const partData: Partial<Omit<Part, 'id' | 'createdAt' | 'updatedAt'>> = {};
         let rowIsValid = true;
 
@@ -337,39 +337,41 @@ export default function InventoryPage() {
                         rowIsValid = false;
                     }
                 }
-                (partData as any)[mapping.targetKey] = undefined; 
+                (partData as Record<string, any>)[mapping.targetKey] = undefined;
                 return;
             }
 
             try {
+                const key = mapping.targetKey;
                 switch (mapping.type) {
                     case 'string':
-                        (partData as any)[mapping.targetKey] = valueStr.startsWith('"') && valueStr.endsWith('"') ? valueStr.slice(1, -1) : valueStr;
+                        const stringValue = valueStr.startsWith('"') && valueStr.endsWith('"') ? valueStr.slice(1, -1) : valueStr;
+                        (partData as Record<keyof Part, string | number | boolean | undefined>)[key] = stringValue;
                         break;
                     case 'number':
                         const numVal = parseFloat(valueStr);
-                        if (isNaN(numVal)) {
-                            if (!mapping.optional) rowIsValid = false; else (partData as any)[mapping.targetKey] = undefined;
+                         if (isNaN(numVal)) {
+                            if (!mapping.optional) rowIsValid = false; else (partData as Record<keyof Part, string | number | boolean | undefined>)[key] = undefined;
                         } else {
-                            (partData as any)[mapping.targetKey] = numVal;
+                            (partData as Record<keyof Part, string | number | boolean | undefined>)[key] = numVal;
                         }
                         break;
                     case 'integer':
                         const intVal = parseInt(valueStr, 10);
                          if (isNaN(intVal)) {
-                            if (!mapping.optional) rowIsValid = false; else (partData as any)[mapping.targetKey] = undefined;
+                            if (!mapping.optional) rowIsValid = false; else (partData as Record<keyof Part, string | number | boolean | undefined>)[key] = undefined;
                         } else {
-                            (partData as any)[mapping.targetKey] = intVal;
+                            (partData as Record<keyof Part, string | number | boolean | undefined>)[key] = intVal;
                         }
                         break;
                     case 'boolean':
                         const lowerVal = valueStr.toLowerCase();
                         if (lowerVal === 'true' || lowerVal === '1') {
-                            partData[mapping.targetKey] = true;
+                            (partData as Record<keyof Part, string | number | boolean | undefined>)[key] = true;
                         } else if (lowerVal === 'false' || lowerVal === '0') {
-                            partData[mapping.targetKey] = false;
+                            (partData as Record<keyof Part, string | number | boolean | undefined>)[key] = false;
                         } else {
-                             if (!mapping.optional) rowIsValid = false; else (partData as any)[mapping.targetKey] = undefined;
+                             if (!mapping.optional) rowIsValid = false; else (partData as Record<keyof Part, string | number | boolean | undefined>)[key] = undefined;
                         }
                         break;
                 }
@@ -379,7 +381,7 @@ export default function InventoryPage() {
         });
 
         if (partData.name === undefined || partData.price === undefined || partData.stockQuantity === undefined || partData.isActive === undefined) {
-            rowIsValid = false; 
+            rowIsValid = false;
         }
 
         if (rowIsValid && (window as any).__inventoryStore) {
@@ -401,7 +403,7 @@ export default function InventoryPage() {
     };
     reader.readAsText(file);
     if(fileInputRef.current) {
-        fileInputRef.current.value = ""; 
+        fileInputRef.current.value = "";
     }
   };
 
@@ -415,9 +417,9 @@ export default function InventoryPage() {
       (part.category && part.category.toLowerCase().includes(lowercasedFilter))
     );
   }, [allParts, searchTerm]);
-  
+
   if (!isMounted) {
-    return <div className="flex justify-center items-center h-screen"><p>Loading inventory...</p></div>; 
+    return <div className="flex justify-center items-center h-screen"><p>Loading inventory...</p></div>;
   }
 
   return (
@@ -450,12 +452,12 @@ export default function InventoryPage() {
             <Button onClick={() => fileInputRef.current?.click()} variant="outline" className="w-full sm:w-auto">
               <Upload className="mr-2 h-4 w-4" /> Import CSV
             </Button>
-            <input 
-                type="file" 
-                ref={fileInputRef} 
-                onChange={handleImportCSV} 
-                accept=".csv" 
-                className="hidden" 
+            <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleImportCSV}
+                accept=".csv"
+                className="hidden"
             />
             <Button onClick={handleExportCSV} variant="outline" className="w-full sm:w-auto">
               <Download className="mr-2 h-4 w-4" /> Export CSV
@@ -512,9 +514,9 @@ export default function InventoryPage() {
                             <span className="sr-only">Edit</span>
                           </Link>
                         </Button>
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
+                        <Button
+                          variant="ghost"
+                          size="icon"
                           className="hover:text-destructive"
                           onClick={() => handleDeletePart(part)}
                         >
@@ -556,4 +558,3 @@ export default function InventoryPage() {
     </div>
   );
 }
-
