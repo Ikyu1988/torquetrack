@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PlusCircle, Bike, Pencil, Trash2 } from "lucide-react";
@@ -98,6 +98,36 @@ export default function MotorcyclesPage() {
   const [motorcycleToDelete, setMotorcycleToDelete] = useState<Motorcycle | null>(null);
   const [isMounted, setIsMounted] = useState(false);
 
+  const getCustomerName = useCallback((customerId: string) => {
+    const customer = customers.find(c => c.id === customerId);
+    return customer ? `${customer.firstName} ${customer.lastName}` : "Unknown Owner";
+  }, [customers]);
+
+  const refreshMotorcycles = useCallback(() => {
+    if (typeof window !== 'undefined' && (window as any).__motorcycleStore) {
+      const storeMotorcycles = (window as any).__motorcycleStore.motorcycles;
+      setMotorcycles(prevMotorcycles => {
+        if(JSON.stringify(storeMotorcycles) !== JSON.stringify(prevMotorcycles)) {
+            return [...storeMotorcycles];
+        }
+        return prevMotorcycles;
+      });
+    }
+  }, []);
+  
+  const refreshCustomers = useCallback(() => {
+    if (typeof window !== 'undefined' && (window as any).__customerStore) {
+        const storeCustomers = (window as any).__customerStore.customers;
+        setCustomers(prevCustomers => {
+             if(JSON.stringify(storeCustomers) !== JSON.stringify(prevCustomers)) {
+                return [...storeCustomers];
+            }
+            return prevCustomers;
+        });
+    }
+  }, []);
+
+
   useEffect(() => {
     setIsMounted(true);
     if (typeof window !== 'undefined') {
@@ -110,30 +140,16 @@ export default function MotorcyclesPage() {
     }
   }, []);
 
-  const getCustomerName = (customerId: string) => {
-    const customer = customers.find(c => c.id === customerId);
-    return customer ? `${customer.firstName} ${customer.lastName}` : "Unknown Owner";
-  };
-
-  const refreshMotorcycles = () => {
-    if (typeof window !== 'undefined' && (window as any).__motorcycleStore) {
-      setMotorcycles([...(window as any).__motorcycleStore.motorcycles]);
-    }
-  };
 
   useEffect(() => {
-    if (!isMounted) return; // Ensure this runs only after mount
+    if (!isMounted) return; 
 
     const interval = setInterval(() => {
-      if (typeof window !== 'undefined' && (window as any).__motorcycleStore) {
-        const storeMotorcycles = (window as any).__motorcycleStore.motorcycles;
-        if (JSON.stringify(storeMotorcycles) !== JSON.stringify(motorcycles)) {
-          refreshMotorcycles();
-        }
-      }
+      refreshMotorcycles();
+      refreshCustomers();
     }, 1000);
     return () => clearInterval(interval);
-  }, [motorcycles, isMounted]); // Added isMounted to dependencies
+  }, [isMounted, refreshMotorcycles, refreshCustomers]); 
 
   const handleDeleteMotorcycle = (motorcycle: Motorcycle) => {
     setMotorcycleToDelete(motorcycle);
@@ -246,3 +262,4 @@ export default function MotorcyclesPage() {
     </div>
   );
 }
+

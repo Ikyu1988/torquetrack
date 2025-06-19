@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PlusCircle, Users, Pencil, Trash2, Search } from "lucide-react";
@@ -106,40 +106,40 @@ export default function CustomersPage() {
   const [customerToDelete, setCustomerToDelete] = useState<Customer | null>(null);
   const [isMounted, setIsMounted] = useState(false);
 
+  const refreshCustomers = useCallback(() => {
+    if (typeof window !== 'undefined' && (window as any).__customerStore) {
+      const storeCustomers = (window as any).__customerStore.customers;
+      setAllCustomers(prevCustomers => {
+        if (JSON.stringify(storeCustomers) !== JSON.stringify(prevCustomers)) {
+          return [...storeCustomers];
+        }
+        return prevCustomers;
+      });
+    }
+  }, []);
+
   useEffect(() => {
     setIsMounted(true);
     if (typeof window !== 'undefined' && (window as any).__customerStore) {
-      // Ensure the local state is initialized from the store, which might have already been populated
       const storeCustomers = (window as any).__customerStore.customers;
       if (storeCustomers && storeCustomers.length > 0) {
         setAllCustomers([...storeCustomers]);
       } else if (initialCustomers.length > 0 && (!storeCustomers || storeCustomers.length === 0)) {
-        // Fallback to initialCustomers if store is empty but should have data
         (window as any).__customerStore.customers = [...initialCustomers];
         setAllCustomers([...initialCustomers]);
       }
     }
   }, []);
 
-  const refreshCustomers = () => {
-    if (typeof window !== 'undefined' && (window as any).__customerStore) {
-      setAllCustomers([...(window as any).__customerStore.customers]);
-    }
-  };
 
   useEffect(() => {
     if (!isMounted) return; 
 
     const interval = setInterval(() => {
-      if (typeof window !== 'undefined' && (window as any).__customerStore) {
-        const storeCustomers = (window as any).__customerStore.customers;
-        if (JSON.stringify(storeCustomers) !== JSON.stringify(allCustomers)) {
-          refreshCustomers();
-        }
-      }
+      refreshCustomers();
     }, 1000); 
     return () => clearInterval(interval);
-  }, [allCustomers, isMounted]);
+  }, [isMounted, refreshCustomers]);
 
 
   const handleDeleteCustomer = (customer: Customer) => {
@@ -151,7 +151,7 @@ export default function CustomersPage() {
     if (customerToDelete) {
       if (typeof window !== 'undefined' && (window as any).__customerStore) {
         (window as any).__customerStore.deleteCustomer(customerToDelete.id);
-        refreshCustomers();
+        refreshCustomers(); // Ensure UI updates after delete
         toast({
           title: "Customer Deleted",
           description: `${customerToDelete.firstName} ${customerToDelete.lastName} has been successfully deleted.`,
@@ -275,3 +275,4 @@ export default function CustomersPage() {
     </div>
   );
 }
+

@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PlusCircle, ArchiveRestore, Eye, Search } from "lucide-react";
@@ -104,6 +104,18 @@ export default function GoodsReceiptsPage() {
     return map;
   }, [suppliers]);
 
+  const refreshGoodsReceipts = useCallback(() => {
+    if (typeof window !== 'undefined' && (window as any).__goodsReceiptStore) {
+      const storeGRs = (window as any).__goodsReceiptStore.goodsReceipts;
+      setAllGoodsReceipts(prevGRs => {
+        if (JSON.stringify(storeGRs) !== JSON.stringify(prevGRs)) {
+          return [...storeGRs];
+        }
+        return prevGRs;
+      });
+    }
+  }, []);
+
   useEffect(() => {
     setIsMounted(true);
     if (typeof window !== 'undefined') {
@@ -125,24 +137,13 @@ export default function GoodsReceiptsPage() {
     }
   }, []);
 
-  const refreshGoodsReceipts = () => {
-    if (typeof window !== 'undefined' && (window as any).__goodsReceiptStore) {
-      setAllGoodsReceipts([...(window as any).__goodsReceiptStore.goodsReceipts]);
-    }
-  };
-
   useEffect(() => {
     if (!isMounted) return;
     const interval = setInterval(() => {
-      if (typeof window !== 'undefined' && (window as any).__goodsReceiptStore) {
-        const storeGRs = (window as any).__goodsReceiptStore.goodsReceipts;
-        if (JSON.stringify(storeGRs) !== JSON.stringify(allGoodsReceipts)) {
-          refreshGoodsReceipts();
-        }
-      }
+      refreshGoodsReceipts();
     }, 1000);
     return () => clearInterval(interval);
-  }, [allGoodsReceipts, isMounted]);
+  }, [isMounted, refreshGoodsReceipts]);
   
   const filteredGoodsReceipts = useMemo(() => {
     let filtered = allGoodsReceipts;
@@ -249,3 +250,4 @@ export default function GoodsReceiptsPage() {
     </div>
   );
 }
+

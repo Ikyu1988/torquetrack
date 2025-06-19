@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PlusCircle, Receipt, Pencil, Trash2, Eye, Search } from "lucide-react";
@@ -132,6 +132,18 @@ export default function PurchaseOrdersPage() {
     return map;
   }, [suppliers]);
 
+  const refreshPurchaseOrders = useCallback(() => {
+    if (typeof window !== 'undefined' && (window as any).__purchaseOrderStore) {
+      const storePOs = (window as any).__purchaseOrderStore.purchaseOrders;
+      setAllPurchaseOrders(prevPOs => {
+        if (JSON.stringify(storePOs) !== JSON.stringify(prevPOs)) {
+          return [...storePOs];
+        }
+        return prevPOs;
+      });
+    }
+  }, []);
+
   useEffect(() => {
     setIsMounted(true);
     if (typeof window !== 'undefined') {
@@ -153,24 +165,14 @@ export default function PurchaseOrdersPage() {
     }
   }, []);
 
-  const refreshPurchaseOrders = () => {
-    if (typeof window !== 'undefined' && (window as any).__purchaseOrderStore) {
-      setAllPurchaseOrders([...(window as any).__purchaseOrderStore.purchaseOrders]);
-    }
-  };
 
   useEffect(() => {
     if (!isMounted) return;
     const interval = setInterval(() => {
-      if (typeof window !== 'undefined' && (window as any).__purchaseOrderStore) {
-        const storePOs = (window as any).__purchaseOrderStore.purchaseOrders;
-        if (JSON.stringify(storePOs) !== JSON.stringify(allPurchaseOrders)) {
-          refreshPurchaseOrders();
-        }
-      }
+      refreshPurchaseOrders();
     }, 1000);
     return () => clearInterval(interval);
-  }, [allPurchaseOrders, isMounted]);
+  }, [isMounted, refreshPurchaseOrders]);
 
   const handleDeletePurchaseOrder = (po: PurchaseOrder) => {
     if (po.status === PURCHASE_ORDER_STATUSES.FULLY_RECEIVED || po.status === PURCHASE_ORDER_STATUSES.PARTIALLY_RECEIVED) {
@@ -334,3 +336,4 @@ export default function PurchaseOrdersPage() {
     </div>
   );
 }
+

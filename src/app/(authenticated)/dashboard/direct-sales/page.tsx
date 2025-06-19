@@ -20,7 +20,7 @@ import { ShoppingCart, PlusCircle, Trash2, Printer, Eye, ClipboardList } from "l
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
 import type { SalesOrder, Customer, Part, PaymentMethod, ShopSettings, Payment } from "@/types";
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SALES_ORDER_STATUSES, PAYMENT_STATUSES, PAYMENT_METHOD_OPTIONS } from "@/lib/constants";
 import { Separator } from "@/components/ui/separator";
@@ -210,28 +210,45 @@ export default function DirectSalesPage() {
     return currentSubTotalNet + calculatedTaxAmountForDisplay;
   }, [subTotalParts, discountAmountWatch, calculatedTaxAmountForDisplay]);
 
-  const fetchAndSetData = () => {
+  const fetchAndSetData = useCallback(() => {
     if (typeof window !== 'undefined') {
-      if ((window as any).__customerStore) setCustomers((window as any).__customerStore.customers);
-      if ((window as any).__inventoryStore) setAvailableParts((window as any).__inventoryStore.parts.filter((p: Part) => p.isActive && p.stockQuantity > 0));
-      if ((window as any).__settingsStore) setShopSettings((window as any).__settingsStore.getSettings());
+      if ((window as any).__customerStore) {
+        setCustomers(prev => {
+          const storeCustomers = (window as any).__customerStore.customers;
+          return JSON.stringify(storeCustomers) !== JSON.stringify(prev) ? [...storeCustomers] : prev;
+        });
+      }
+      if ((window as any).__inventoryStore) {
+        setAvailableParts(prev => {
+          const storeParts = (window as any).__inventoryStore.parts.filter((p: Part) => p.isActive && p.stockQuantity > 0);
+          return JSON.stringify(storeParts) !== JSON.stringify(prev) ? [...storeParts] : prev;
+        });
+      }
+      if ((window as any).__settingsStore) {
+        setShopSettings(prev => {
+          const storeSettings = (window as any).__settingsStore.getSettings();
+          return JSON.stringify(storeSettings) !== JSON.stringify(prev) ? {...storeSettings} : prev;
+        });
+      }
       if ((window as any).__salesOrderStore) {
-        const sales = ((window as any).__salesOrderStore.salesOrders || []).map((so: SalesOrder) => (window as any).__salesOrderStore.getSalesOrderById(so.id)).filter(Boolean);
-        setCompletedSales(sales);
+        setCompletedSales(prev => {
+          const sales = ((window as any).__salesOrderStore.salesOrders || []).map((so: SalesOrder) => (window as any).__salesOrderStore.getSalesOrderById(so.id)).filter(Boolean);
+          return JSON.stringify(sales) !== JSON.stringify(prev) ? [...sales] : prev;
+        });
       }
     }
-  };
+  }, []);
 
   useEffect(() => {
     setIsMounted(true);
     fetchAndSetData();
-  }, []);
+  }, [fetchAndSetData]);
 
   useEffect(() => {
     if (!isMounted) return;
     const interval = setInterval(fetchAndSetData, 1500); 
     return () => clearInterval(interval);
-  }, [isMounted]);
+  }, [isMounted, fetchAndSetData]);
 
 
   function onSubmit(data: SalesOrderFormValues) {
@@ -590,4 +607,5 @@ export default function DirectSalesPage() {
     </div>
   );
 }
+
 

@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PlusCircle, Truck, Pencil, Trash2, Search } from "lucide-react";
@@ -98,6 +98,18 @@ export default function SuppliersPage() {
   const [supplierToDelete, setSupplierToDelete] = useState<Supplier | null>(null);
   const [isMounted, setIsMounted] = useState(false);
 
+  const refreshSuppliers = useCallback(() => {
+    if (typeof window !== 'undefined' && (window as any).__supplierStore) {
+      const storeSuppliers = (window as any).__supplierStore.suppliers;
+      setAllSuppliers(prevSuppliers => {
+        if (JSON.stringify(storeSuppliers) !== JSON.stringify(prevSuppliers)) {
+          return [...storeSuppliers];
+        }
+        return prevSuppliers;
+      });
+    }
+  }, []);
+
   useEffect(() => {
     setIsMounted(true);
     if (typeof window !== 'undefined' && (window as any).__supplierStore) {
@@ -111,24 +123,13 @@ export default function SuppliersPage() {
     }
   }, []);
 
-  const refreshSuppliers = () => {
-    if (typeof window !== 'undefined' && (window as any).__supplierStore) {
-      setAllSuppliers([...(window as any).__supplierStore.suppliers]);
-    }
-  };
-
   useEffect(() => {
     if (!isMounted) return;
     const interval = setInterval(() => {
-      if (typeof window !== 'undefined' && (window as any).__supplierStore) {
-        const storeSuppliers = (window as any).__supplierStore.suppliers;
-        if (JSON.stringify(storeSuppliers) !== JSON.stringify(allSuppliers)) {
-          refreshSuppliers();
-        }
-      }
+      refreshSuppliers();
     }, 1000);
     return () => clearInterval(interval);
-  }, [allSuppliers, isMounted]);
+  }, [isMounted, refreshSuppliers]);
 
   const handleDeleteSupplier = (supplier: Supplier) => {
     setSupplierToDelete(supplier);
@@ -269,3 +270,4 @@ export default function SuppliersPage() {
     </div>
   );
 }
+

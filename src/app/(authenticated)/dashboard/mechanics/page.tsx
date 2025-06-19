@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PlusCircle, UserCog, Pencil, Trash2, Search } from "lucide-react";
@@ -101,6 +101,18 @@ export default function MechanicsPage() {
   const [mechanicToDelete, setMechanicToDelete] = useState<Mechanic | null>(null);
   const [isMounted, setIsMounted] = useState(false);
 
+  const refreshMechanics = useCallback(() => {
+    if (typeof window !== 'undefined' && (window as any).__mechanicStore) {
+      const storeMechanics = (window as any).__mechanicStore.mechanics;
+      setAllMechanics(prevMechanics => {
+        if (JSON.stringify(storeMechanics) !== JSON.stringify(prevMechanics)) {
+          return [...storeMechanics];
+        }
+        return prevMechanics;
+      });
+    }
+  }, []);
+
   useEffect(() => {
     setIsMounted(true);
     if (typeof window !== 'undefined' && (window as any).__mechanicStore) {
@@ -114,25 +126,14 @@ export default function MechanicsPage() {
     }
   }, []);
 
-  const refreshMechanics = () => {
-    if (typeof window !== 'undefined' && (window as any).__mechanicStore) {
-      setAllMechanics([...(window as any).__mechanicStore.mechanics]);
-    }
-  };
-
   useEffect(() => {
     if (!isMounted) return;
 
     const interval = setInterval(() => {
-      if (typeof window !== 'undefined' && (window as any).__mechanicStore) {
-        const storeMechanics = (window as any).__mechanicStore.mechanics;
-        if (JSON.stringify(storeMechanics) !== JSON.stringify(allMechanics)) {
-          refreshMechanics();
-        }
-      }
+      refreshMechanics();
     }, 1000);
     return () => clearInterval(interval);
-  }, [allMechanics, isMounted]);
+  }, [isMounted, refreshMechanics]);
 
   const handleDeleteMechanic = (mechanic: Mechanic) => {
     setMechanicToDelete(mechanic);
@@ -267,3 +268,4 @@ export default function MechanicsPage() {
     </div>
   );
 }
+

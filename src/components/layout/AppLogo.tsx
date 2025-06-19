@@ -3,35 +3,37 @@
 
 import Link from "next/link";
 import { Wrench } from "lucide-react"; 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import type { ShopSettings } from "@/types";
 
 export function AppLogo({ collapsed } : { collapsed?: boolean }) {
   const [shopName, setShopName] = useState("TorqueTrack");
   const [isMounted, setIsMounted] = useState(false);
-  const shopNameRef = useRef(shopName); // To compare against in interval
+  const shopNameRef = useRef(shopName);
 
   useEffect(() => {
     setIsMounted(true);
   }, []);
 
+  const updateShopNameDisplay = useCallback(() => {
+    if (typeof window !== 'undefined' && (window as any).__settingsStore) {
+      const currentSettings: ShopSettings | undefined = (window as any).__settingsStore.getSettings();
+      const newName = currentSettings?.shopName || "TorqueTrack";
+      if (shopNameRef.current !== newName) {
+        setShopName(newName);
+        shopNameRef.current = newName;
+      }
+    }
+  }, []); // No dependencies needed for this version as it reads directly
+
   useEffect(() => {
-    if (isMounted && typeof window !== 'undefined' && (window as any).__settingsStore) {
-      const updateShopNameDisplay = () => {
-        const currentSettings: ShopSettings | undefined = (window as any).__settingsStore.getSettings();
-        const newName = currentSettings?.shopName || "TorqueTrack";
-        if (shopNameRef.current !== newName) {
-          setShopName(newName);
-          shopNameRef.current = newName;
-        }
-      };
-      
+    if (isMounted) {
       updateShopNameDisplay(); // Initial load
 
-      const intervalId = setInterval(updateShopNameDisplay, 2000); // Periodically check every 2 seconds
-      return () => clearInterval(intervalId); // Cleanup interval on unmount
+      const intervalId = setInterval(updateShopNameDisplay, 2000); 
+      return () => clearInterval(intervalId); 
     }
-  }, [isMounted]);
+  }, [isMounted, updateShopNameDisplay]);
 
   return (
     <Link href="/" className="flex items-center gap-2 text-primary hover:opacity-80 transition-opacity duration-200">

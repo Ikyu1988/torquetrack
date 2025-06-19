@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useEffect, useRef, useMemo } from "react";
+import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PlusCircle, Package, Pencil, Trash2, Download, Upload, AlertTriangle, Edit, Search } from "lucide-react";
@@ -160,6 +160,29 @@ export default function InventoryPage() {
 
   const currency = useMemo(() => shopSettings?.currencySymbol || '₱', [shopSettings]);
 
+  const refreshParts = useCallback(() => {
+    if (typeof window !== 'undefined' && (window as any).__inventoryStore) {
+      const storeParts = (window as any).__inventoryStore.parts;
+      setAllParts(prevParts => {
+        if (JSON.stringify(storeParts) !== JSON.stringify(prevParts)) {
+          return [...storeParts];
+        }
+        return prevParts;
+      });
+    }
+  }, []);
+
+  const refreshShopSettings = useCallback(() => {
+    if (typeof window !== 'undefined' && (window as any).__settingsStore) {
+        const newSettings = (window as any).__settingsStore.getSettings();
+        if (JSON.stringify(newSettings) !== JSON.stringify(shopSettingsRef.current)) {
+            setShopSettings(newSettings);
+            shopSettingsRef.current = newSettings;
+        }
+    }
+  }, []);
+
+
   useEffect(() => {
     setIsMounted(true);
     if (typeof window !== 'undefined') {
@@ -180,34 +203,16 @@ export default function InventoryPage() {
     }
   }, []);
 
-  const refreshParts = () => {
-    if (typeof window !== 'undefined' && (window as any).__inventoryStore) {
-      setAllParts([...(window as any).__inventoryStore.parts]);
-    }
-  };
 
   useEffect(() => {
     if (!isMounted) return;
 
     const interval = setInterval(() => {
-      if (typeof window !== 'undefined') {
-        if((window as any).__inventoryStore) {
-            const storeParts = (window as any).__inventoryStore.parts;
-            if (JSON.stringify(storeParts) !== JSON.stringify(allParts)) {
-            refreshParts();
-            }
-        }
-        if ((window as any).__settingsStore) {
-            const newSettings = (window as any).__settingsStore.getSettings();
-            if (JSON.stringify(newSettings) !== JSON.stringify(shopSettingsRef.current)) {
-                setShopSettings(newSettings);
-                shopSettingsRef.current = newSettings;
-            }
-        }
-      }
+      refreshParts();
+      refreshShopSettings();
     }, 1000); 
     return () => clearInterval(interval);
-  }, [allParts, isMounted]); 
+  }, [isMounted, refreshParts, refreshShopSettings]); 
 
   const handleDeletePart = (part: Part) => {
     setPartToDelete(part);
@@ -551,3 +556,4 @@ export default function InventoryPage() {
     </div>
   );
 }
+

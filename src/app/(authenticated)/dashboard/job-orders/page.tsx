@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PlusCircle, ClipboardList, Pencil, Trash2, Eye, Search } from "lucide-react";
@@ -25,7 +25,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
-import type { JobOrder, Customer, Motorcycle, Part, Service, Payment, PaymentMethod, ShopSettings } from "@/types";
+import type { JobOrder, Customer, Motorcycle, Part, Service, Payment, PaymentMethod, ShopSettings, JobOrderStatus } from "@/types";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { PAYMENT_STATUSES, JOB_ORDER_STATUSES, JOB_ORDER_STATUS_OPTIONS } from "@/lib/constants";
@@ -290,6 +290,37 @@ export default function JobOrdersPage() {
 
   const currency = useMemo(() => shopSettings?.currencySymbol || '₱', [shopSettings]);
 
+  const customerMap = useMemo(() => {
+    const map = new Map<string, string>();
+    customers.forEach(c => map.set(c.id, `${c.firstName} ${c.lastName}`));
+    return map;
+  }, [customers]);
+
+  const motorcycleMap = useMemo(() => {
+    const map = new Map<string, { make: string, model: string, plateNumber: string }>();
+    motorcycles.forEach(m => {
+        map.set(m.id, {make: m.make, model: m.model, plateNumber: m.plateNumber});
+    });
+    return map;
+  }, [motorcycles]);
+
+  const refreshJobOrders = useCallback(() => {
+    if (typeof window !== 'undefined' && (window as any).__jobOrderStore) {
+       const ordersFromStore = ((window as any).__jobOrderStore.jobOrders || []).map((jo: JobOrder) => {
+            if ((window as any).__paymentStore && (window as any).__jobOrderStore.getJobOrderById) { 
+                 return (window as any).__jobOrderStore.getJobOrderById(jo.id);
+            }
+            return jo;
+        }).filter(Boolean);
+      setAllJobOrders(prevOrders => {
+        if (JSON.stringify(ordersFromStore) !== JSON.stringify(prevOrders)) {
+            return [...ordersFromStore];
+        }
+        return prevOrders;
+      });
+    }
+  }, []);
+
   useEffect(() => {
     setIsMounted(true);
     if (typeof window !== 'undefined') {
@@ -320,50 +351,14 @@ export default function JobOrdersPage() {
     }
   }, []);
 
-  const customerMap = useMemo(() => {
-    const map = new Map<string, string>();
-    customers.forEach(c => map.set(c.id, `${c.firstName} ${c.lastName}`));
-    return map;
-  }, [customers]);
-
-  const motorcycleMap = useMemo(() => {
-    const map = new Map<string, { make: string, model: string, plateNumber: string }>();
-    motorcycles.forEach(m => {
-        map.set(m.id, {make: m.make, model: m.model, plateNumber: m.plateNumber});
-    });
-    return map;
-  }, [motorcycles]);
-
-  const refreshJobOrders = () => {
-    if (typeof window !== 'undefined' && (window as any).__jobOrderStore) {
-       const ordersFromStore = ((window as any).__jobOrderStore.jobOrders || []).map((jo: JobOrder) => {
-            if ((window as any).__paymentStore && (window as any).__jobOrderStore.getJobOrderById) { 
-                 return (window as any).__jobOrderStore.getJobOrderById(jo.id);
-            }
-            return jo;
-        }).filter(Boolean);
-      setAllJobOrders([...ordersFromStore]);
-    }
-  };
 
   useEffect(() => {
     if (!isMounted) return;
     const interval = setInterval(() => {
-      if (typeof window !== 'undefined' && (window as any).__jobOrderStore) {
-        const storeJobOrdersRaw = (window as any).__jobOrderStore.jobOrders;
-        const currentJOStates = allJobOrders.map(jo => ({id: jo.id, updatedAt: jo.updatedAt, amountPaid: jo.amountPaid, paymentStatus: jo.paymentStatus}));
-        const storeJOStates = storeJobOrdersRaw.map((jo:JobOrder) => {
-            const fullJo = (window as any).__jobOrderStore.getJobOrderById(jo.id);
-            return {id: fullJo?.id, updatedAt: fullJo?.updatedAt, amountPaid: fullJo?.amountPaid, paymentStatus: fullJo?.paymentStatus};
-        }).filter(Boolean);
-
-        if (JSON.stringify(storeJOStates) !== JSON.stringify(currentJOStates)) {
-          refreshJobOrders();
-        }
-      }
+      refreshJobOrders();
     }, 1000);
     return () => clearInterval(interval);
-  }, [allJobOrders, isMounted]);
+  }, [isMounted, refreshJobOrders]);
 
   const handleDeleteJobOrder = (jobOrder: JobOrder) => {
     setJobOrderToDelete(jobOrder);
@@ -535,3 +530,4 @@ export default function JobOrdersPage() {
     </div>
   );
 }
+

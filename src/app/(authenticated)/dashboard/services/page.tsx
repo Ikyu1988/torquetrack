@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PlusCircle, Wrench, Pencil, Trash2, Search } from "lucide-react";
@@ -115,6 +115,18 @@ export default function ServicesPage() {
 
   const currency = useMemo(() => shopSettings?.currencySymbol || '₱', [shopSettings]);
 
+  const refreshServices = useCallback(() => {
+    if (typeof window !== 'undefined' && (window as any).__serviceStore) {
+      const storeServices = (window as any).__serviceStore.services;
+       setAllServices(prevServices => {
+        if (JSON.stringify(storeServices) !== JSON.stringify(prevServices)) {
+          return [...storeServices];
+        }
+        return prevServices;
+      });
+    }
+  }, []);
+
   useEffect(() => {
     setIsMounted(true);
     if (typeof window !== 'undefined') {
@@ -133,25 +145,14 @@ export default function ServicesPage() {
     }
   }, []);
 
-  const refreshServices = () => {
-    if (typeof window !== 'undefined' && (window as any).__serviceStore) {
-      setAllServices([...(window as any).__serviceStore.services]);
-    }
-  };
-
   useEffect(() => {
     if (!isMounted) return;
 
     const interval = setInterval(() => {
-      if (typeof window !== 'undefined' && (window as any).__serviceStore) {
-        const storeServices = (window as any).__serviceStore.services;
-        if (JSON.stringify(storeServices) !== JSON.stringify(allServices)) {
-          refreshServices();
-        }
-      }
+      refreshServices();
     }, 1000);
     return () => clearInterval(interval);
-  }, [allServices, isMounted]);
+  }, [isMounted, refreshServices]);
 
   const handleDeleteService = (service: Service) => {
     setServiceToDelete(service);
@@ -294,3 +295,4 @@ export default function ServicesPage() {
     </div>
   );
 }
+

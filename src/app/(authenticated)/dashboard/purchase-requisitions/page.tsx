@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PlusCircle, FilePlus, Pencil, Trash2, Eye, Search } from "lucide-react";
@@ -25,7 +25,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
-import type { PurchaseRequisition, ShopSettings } from "@/types";
+import type { PurchaseRequisition, ShopSettings, PurchaseRequisitionStatus } from "@/types";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { PURCHASE_REQUISITION_STATUSES, PURCHASE_REQUISITION_STATUS_OPTIONS } from "@/lib/constants";
@@ -118,6 +118,18 @@ export default function PurchaseRequisitionsPage() {
 
   const currency = useMemo(() => shopSettings?.currencySymbol || '₱', [shopSettings]);
 
+  const refreshRequisitions = useCallback(() => {
+    if (typeof window !== 'undefined' && (window as any).__purchaseRequisitionStore) {
+      const storeRequisitions = (window as any).__purchaseRequisitionStore.requisitions;
+      setAllRequisitions(prevRequisitions => {
+        if (JSON.stringify(storeRequisitions) !== JSON.stringify(prevRequisitions)) {
+          return [...storeRequisitions];
+        }
+        return prevRequisitions;
+      });
+    }
+  }, []);
+
   useEffect(() => {
     setIsMounted(true);
     if (typeof window !== 'undefined') {
@@ -136,24 +148,13 @@ export default function PurchaseRequisitionsPage() {
     }
   }, []);
 
-  const refreshRequisitions = () => {
-    if (typeof window !== 'undefined' && (window as any).__purchaseRequisitionStore) {
-      setAllRequisitions([...(window as any).__purchaseRequisitionStore.requisitions]);
-    }
-  };
-
   useEffect(() => {
     if (!isMounted) return;
     const interval = setInterval(() => {
-      if (typeof window !== 'undefined' && (window as any).__purchaseRequisitionStore) {
-        const storeRequisitions = (window as any).__purchaseRequisitionStore.requisitions;
-        if (JSON.stringify(storeRequisitions) !== JSON.stringify(allRequisitions)) {
-          refreshRequisitions();
-        }
-      }
+      refreshRequisitions();
     }, 1000);
     return () => clearInterval(interval);
-  }, [allRequisitions, isMounted]);
+  }, [isMounted, refreshRequisitions]);
 
   const handleDeleteRequisition = (requisition: PurchaseRequisition) => {
     if (requisition.status === PURCHASE_REQUISITION_STATUSES.ORDERED) {
@@ -321,3 +322,4 @@ export default function PurchaseRequisitionsPage() {
     </div>
   );
 }
+
