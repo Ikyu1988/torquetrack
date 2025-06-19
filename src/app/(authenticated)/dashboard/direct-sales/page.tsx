@@ -137,7 +137,7 @@ if (typeof window !== 'undefined') {
         const orderIndex = (window as any).__salesOrderStore.salesOrders.findIndex((so: SalesOrder) => so.id === orderId);
         if (orderIndex !== -1) {
             const order = (window as any).__salesOrderStore.salesOrders[orderIndex];
-            if (!order.paymentHistory.find(p => p.id === payment.id)) {
+            if (!order.paymentHistory.find((p: Payment) => p.id === payment.id)) {
                 order.paymentHistory.push(payment);
                 order.amountPaid += payment.amount;
             } else {
