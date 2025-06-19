@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Separator } from "@/components/ui/separator";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
-import type { JobOrder, Customer, Mechanic, Part, Service, Payment, ShopSettings, JobOrderServiceItem, CommissionType, JobOrderStatus, SalesOrder, SalesOrderStatus } from "@/types";
+import type { JobOrder, Customer, Mechanic, Part, Service, Payment, ShopSettings, JobOrderServiceItem, CommissionType, JobOrderStatus, SalesOrder, SalesOrderStatus, SalesOrderItem } from "@/types";
 import { JOB_ORDER_STATUS_OPTIONS, SALES_ORDER_STATUS_OPTIONS, COMMISSION_TYPES, PAYMENT_STATUSES } from "@/lib/constants";
 import { format, startOfMonth } from "date-fns";
 
@@ -91,8 +91,8 @@ export default function ReportsPage() {
   useEffect(() => {
     setIsMounted(true);
     if (typeof window !== 'undefined') {
-      if ((window as any).__jobOrderStore) setAllJobOrders((window as any).__jobOrderStore.jobOrders || []);
-      if ((window as any).__salesOrderStore) setAllSalesOrders((window as any).__salesOrderStore.salesOrders || []);
+      if ((window as any).__jobOrderStore) setAllJobOrders(((window as any).__jobOrderStore.jobOrders || []).map((jo: JobOrder) => (window as any).__jobOrderStore.getJobOrderById ? (window as any).__jobOrderStore.getJobOrderById(jo.id) : jo).filter(Boolean));
+      if ((window as any).__salesOrderStore) setAllSalesOrders(((window as any).__salesOrderStore.salesOrders || []).map((so: SalesOrder) => (window as any).__salesOrderStore.getSalesOrderById ? (window as any).__salesOrderStore.getSalesOrderById(so.id) : so).filter(Boolean));
       if ((window as any).__mechanicStore) setAllMechanics((window as any).__mechanicStore.mechanics || []);
       if ((window as any).__customerStore) setAllCustomers((window as any).__customerStore.customers || []);
       if ((window as any).__serviceStore) setAllServices((window as any).__serviceStore.services || []);
@@ -128,7 +128,7 @@ export default function ReportsPage() {
 
     setTimeout(() => {
       try {
-        const filteredJobOrders = allJobOrders.filter(jo => {
+        const filteredJobOrders = allJobOrders.filter((jo: JobOrder) => {
           if (!startDate || !endDate) return true;
           const joDate = new Date(jo.createdAt);
           const inDateRange = joDate >= startDate && joDate <= endDate;
@@ -136,13 +136,13 @@ export default function ReportsPage() {
 
           let mechanicMatch = selectedMechanicId === "ALL";
           if (selectedMechanicId !== "ALL") {
-            mechanicMatch = jo.servicesPerformed && jo.servicesPerformed.some(s => s.assignedMechanicId === selectedMechanicId);
+            mechanicMatch = jo.servicesPerformed && jo.servicesPerformed.some((s: JobOrderServiceItem) => s.assignedMechanicId === selectedMechanicId);
           }
 
           return inDateRange && statusMatch && mechanicMatch;
         });
 
-        const filteredSalesOrders = allSalesOrders.filter(so => {
+        const filteredSalesOrders = allSalesOrders.filter((so: SalesOrder) => {
             if (!startDate || !endDate) return true;
             const soDate = new Date(so.createdAt);
             const inDateRange = soDate >= startDate && soDate <= endDate;
@@ -152,11 +152,11 @@ export default function ReportsPage() {
 
         switch (reportType) {
           case "jobOrderSummary":
-            const summary = filteredJobOrders.map(jo => ({
+            const summary = filteredJobOrders.map((jo: JobOrder) => ({
               ID: jo.id.substring(0,6),
               Customer: jo.customerId ? customerMap.get(jo.customerId) || "N/A" : "N/A",
               Motorcycle: jo.motorcycleId && (window as any).__motorcycleStore?.getMotorcycleById(jo.motorcycleId)?.model || "N/A",
-              Mechanic: jo.servicesPerformed?.map(s => s.assignedMechanicId ? mechanicMap.get(s.assignedMechanicId) : '').filter(Boolean).join(', ') || 'N/A',
+              Mechanic: jo.servicesPerformed?.map((s: JobOrderServiceItem) => s.assignedMechanicId ? mechanicMap.get(s.assignedMechanicId) : '').filter(Boolean).join(', ') || 'N/A',
               Status: jo.status,
               Date: format(new Date(jo.createdAt), "yyyy-MM-dd"),
               Total: `${currencySymbol}${jo.grandTotal.toFixed(2)}`,
@@ -165,7 +165,7 @@ export default function ReportsPage() {
             break;
 
           case "salesOrderReport":
-            const salesReportData = filteredSalesOrders.map(so => ({
+            const salesReportData = filteredSalesOrders.map((so: SalesOrder) => ({
                 ID: so.id.substring(0,6),
                 Customer: so.customerName || "Walk-in",
                 Status: so.status,
@@ -179,11 +179,11 @@ export default function ReportsPage() {
 
           case "commissionReport":
             let commissions: any[] = [];
-            filteredJobOrders.forEach(jo => { // only from job orders
-              jo.servicesPerformed?.forEach(serviceItem => {
+            filteredJobOrders.forEach((jo: JobOrder) => { 
+              jo.servicesPerformed?.forEach((serviceItem: JobOrderServiceItem) => {
                 if (selectedMechanicId !== "ALL" && serviceItem.assignedMechanicId !== selectedMechanicId) return;
 
-                const serviceDetails = allServices.find(s => s.id === serviceItem.serviceId);
+                const serviceDetails = allServices.find((s: Service) => s.id === serviceItem.serviceId);
                 const mechanicName = serviceItem.assignedMechanicId ? mechanicMap.get(serviceItem.assignedMechanicId) : "N/A";
 
                 if (serviceDetails && serviceDetails.commissionType && serviceDetails.commissionValue !== undefined) {
@@ -209,11 +209,14 @@ export default function ReportsPage() {
 
           case "partsUsage":
             const partsUsage: Record<string, { name: string, sku?: string, quantity: number, totalValue: number }> = {};
-            const combinedOrders: Array<{partsUsed?: Array<{partId:string, partName: string, quantity: number, totalPrice: number}>}> = [...filteredJobOrders, ...filteredSalesOrders.map(so => ({partsUsed: so.items}))];
+            const combinedOrders: Array<{partsUsed?: Array<JobOrderPartItem | SalesOrderItem>}> = [
+                ...filteredJobOrders, 
+                ...filteredSalesOrders.map((so: SalesOrder) => ({partsUsed: so.items}))
+            ];
 
             combinedOrders.forEach(order => {
-                order.partsUsed?.forEach(partItem => {
-                    const partDetails = allParts.find(p => p.id === partItem.partId);
+                order.partsUsed?.forEach((partItem: JobOrderPartItem | SalesOrderItem) => {
+                    const partDetails = allParts.find((p: Part) => p.id === partItem.partId);
                     if (!partsUsage[partItem.partId]) {
                         partsUsage[partItem.partId] = { name: partItem.partName, sku: partDetails?.sku || '-', quantity: 0, totalValue: 0 };
                     }
@@ -224,10 +227,10 @@ export default function ReportsPage() {
             setPartsUsageReport(Object.values(partsUsage).map(p => ({ Name: p.name, SKU: p.sku, QuantityUsed: p.quantity, TotalValue: `${currencySymbol}${p.totalValue.toFixed(2)}` })));
             break;
 
-          case "serviceSales": // Only from Job Orders
+          case "serviceSales": 
             const serviceSales: Record<string, { name: string, count: number, totalRevenue: number }> = {};
-             filteredJobOrders.forEach(jo => {
-                jo.servicesPerformed?.forEach(serviceItem => {
+             filteredJobOrders.forEach((jo: JobOrder) => {
+                jo.servicesPerformed?.forEach((serviceItem: JobOrderServiceItem) => {
                     if (!serviceSales[serviceItem.serviceId]) {
                         serviceSales[serviceItem.serviceId] = { name: serviceItem.serviceName, count: 0, totalRevenue: 0 };
                     }
@@ -240,7 +243,7 @@ export default function ReportsPage() {
 
           case "inventoryValuation":
             let totalVal = 0;
-            const valuationDetails = allParts.map(part => {
+            const valuationDetails = allParts.map((part: Part) => {
                 const value = part.stockQuantity * (part.cost ?? part.price);
                 totalVal += value;
                 return {
@@ -257,11 +260,11 @@ export default function ReportsPage() {
           case "incomeSummary":
             if (!startDate || !endDate) return;
             const currentIncome = allPayments
-              .filter(p => {
+              .filter((p: Payment) => {
                 const paymentDate = new Date(p.paymentDate);
                 return paymentDate >= startDate && paymentDate <= endDate;
               })
-              .reduce((sum, p) => sum + p.amount, 0);
+              .reduce((sum, p: Payment) => sum + p.amount, 0);
             setIncomeSummary({ totalIncome: currentIncome });
             break;
 
@@ -272,21 +275,21 @@ export default function ReportsPage() {
                  break;
             }
             const jobOrderHistory = allJobOrders
-                .filter(jo => jo.customerId === selectedCustomerIdForHistory)
-                .map(jo => ({
+                .filter((jo: JobOrder) => jo.customerId === selectedCustomerIdForHistory)
+                .map((jo: JobOrder) => ({
                     OrderID: `JO-${jo.id.substring(0,6)}`,
                     Type: "Job Order",
                     Date: format(new Date(jo.createdAt), "yyyy-MM-dd"),
-                    Details: jo.servicesPerformed?.map(s => s.serviceName).join(', ') || jo.diagnostics || "N/A",
+                    Details: jo.servicesPerformed?.map((s: JobOrderServiceItem) => s.serviceName).join(', ') || jo.diagnostics || "N/A",
                     Total: `${currencySymbol}${jo.grandTotal.toFixed(2)}`,
                 }));
             const salesOrderHistory = allSalesOrders
-                .filter(so => so.customerId === selectedCustomerIdForHistory)
-                .map(so => ({
+                .filter((so: SalesOrder) => so.customerId === selectedCustomerIdForHistory)
+                .map((so: SalesOrder) => ({
                     OrderID: `SO-${so.id.substring(0,6)}`,
                     Type: "Sales Order",
                     Date: format(new Date(so.createdAt), "yyyy-MM-dd"),
-                    Details: so.items.map(i => `${i.partName} (x${i.quantity})`).join(', ') || "Parts Sale",
+                    Details: so.items.map((i: SalesOrderItem) => `${i.partName} (x${i.quantity})`).join(', ') || "Parts Sale",
                     Total: `${currencySymbol}${so.grandTotal.toFixed(2)}`,
                 }));
             setCustomerServiceHistory([...jobOrderHistory, ...salesOrderHistory].sort((a,b) => new Date(b.Date).getTime() - new Date(a.Date).getTime()));
@@ -294,8 +297,8 @@ export default function ReportsPage() {
 
           case "lowStockItems":
             const lowItems = allParts
-                .filter(part => part.isActive && part.minStockAlert !== undefined && part.stockQuantity <= part.minStockAlert)
-                .map(part => ({
+                .filter((part: Part) => part.isActive && part.minStockAlert !== undefined && part.stockQuantity <= part.minStockAlert)
+                .map((part: Part) => ({
                     PartName: part.name,
                     SKU: part.sku || '-',
                     CurrentStock: part.stockQuantity,
@@ -473,7 +476,7 @@ export default function ReportsPage() {
                 { key: 'Mechanic', label: 'Mechanic' }, { key: 'JobOrderID', label: 'Job ID' }, { key: 'Service', label: 'Service' },
                 { key: 'LaborCost', label: 'Labor' }, { key: 'CommissionRate', label: 'Rate' }, { key: 'CommissionEarned', label: 'Earned' }
             ]}
-             customFilters={ // Only Mechanic filter specific to this report
+             customFilters={ 
                 <div className="grid grid-cols-1 sm:grid-cols-1 gap-4 mb-4">
                     <div className="grid gap-1.5">
                         <label className="text-sm font-medium">Mechanic (for Commission Report)</label>
@@ -575,7 +578,3 @@ export default function ReportsPage() {
     </div>
   );
 }
-
-
-
-
