@@ -47,12 +47,12 @@ const DEFAULT_PLACEHOLDER_MESSAGING_SENDER_ID = "572902936608";
 const DEFAULT_PLACEHOLDER_APP_ID = "1:572902936608:web:fd25063f0707df5e68ec45";
 
 const IS_PLACEHOLDER_CONFIG =
-  !firebaseConfig.apiKey || firebaseConfig.apiKey.startsWith("YOUR_") || firebaseConfig.apiKey === DEFAULT_PLACEHOLDER_API_KEY ||
-  !firebaseConfig.authDomain || firebaseConfig.authDomain.startsWith("YOUR_") || firebaseConfig.authDomain === DEFAULT_PLACEHOLDER_AUTH_DOMAIN ||
-  !firebaseConfig.projectId || firebaseConfig.projectId.startsWith("YOUR_") || firebaseConfig.projectId === DEFAULT_PLACEHOLDER_PROJECT_ID ||
-  !firebaseConfig.storageBucket || firebaseConfig.storageBucket.startsWith("YOUR_") || firebaseConfig.storageBucket === DEFAULT_PLACEHOLDER_STORAGE_BUCKET ||
-  !firebaseConfig.messagingSenderId || firebaseConfig.messagingSenderId.startsWith("YOUR_") || firebaseConfig.messagingSenderId === DEFAULT_PLACEHOLDER_MESSAGING_SENDER_ID ||
-  !firebaseConfig.appId || firebaseConfig.appId.startsWith("YOUR_") || firebaseConfig.appId === DEFAULT_PLACEHOLDER_APP_ID;
+  !firebaseConfig.apiKey || firebaseConfig.apiKey.startsWith("AIzaSyAUdpkhWz2NjWXsn5KamJyYzArVp7szA5Q") || firebaseConfig.apiKey === DEFAULT_PLACEHOLDER_API_KEY ||
+  !firebaseConfig.authDomain || firebaseConfig.authDomain.startsWith("torquetrack-ts3ph.firebaseapp.com") || firebaseConfig.authDomain === DEFAULT_PLACEHOLDER_AUTH_DOMAIN ||
+  !firebaseConfig.projectId || firebaseConfig.projectId.startsWith("torquetrack-ts3ph") || firebaseConfig.projectId === DEFAULT_PLACEHOLDER_PROJECT_ID ||
+  !firebaseConfig.storageBucket || firebaseConfig.storageBucket.startsWith("torquetrack-ts3ph.appspot.com") || firebaseConfig.storageBucket === DEFAULT_PLACEHOLDER_STORAGE_BUCKET ||
+  !firebaseConfig.messagingSenderId || firebaseConfig.messagingSenderId.startsWith("572902936608") || firebaseConfig.messagingSenderId === DEFAULT_PLACEHOLDER_MESSAGING_SENDER_ID ||
+  !firebaseConfig.appId || firebaseConfig.appId.startsWith("1:572902936608:web:fd25063f0707df5e68ec45") || firebaseConfig.appId === DEFAULT_PLACEHOLDER_APP_ID;
 
 
 let app: FirebaseApp;
