@@ -22,7 +22,6 @@ import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
 import type { Mechanic } from "@/types";
 import { Switch } from "@/components/ui/switch";
-// import { Label } from "@/components/ui/label"; // Unused import removed
 
 const mechanicFormSchema = z.object({
   name: z.string().min(1, { message: "Name is required." }).max(100, { message: "Name must be 100 characters or less." }),
