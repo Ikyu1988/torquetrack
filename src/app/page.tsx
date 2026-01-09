@@ -76,7 +76,7 @@ export default function HomePage() {
               </div>
               <div className="md:w-1/2 flex justify-center">
                 <Image 
-                  src="https://placehold.co/500x400.png" 
+                  src="https://picsum.photos/seed/1/500/400"
                   alt="Motorcycle shop illustration" 
                   width={500} 
                   height={400} 
