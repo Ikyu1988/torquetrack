@@ -23,7 +23,6 @@ import { useRouter, useParams } from "next/navigation";
 import type { Mechanic } from "@/types";
 import { useEffect, useState } from "react";
 import { Switch } from "@/components/ui/switch";
-// import { Label } from "@/components/ui/label"; // Unused import removed
 
 const mechanicFormSchema = z.object({
   name: z.string().min(1, { message: "Name is required." }).max(100),
