@@ -16,20 +16,19 @@ import { getAuth, type Auth } from "firebase/auth";
 // #############################################################################
 
 const firebaseConfig = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+  apiKey: "AIzaSyAUdpkhWz2NjWXsn5KamJyYzArVp7szA5Q",
+  authDomain: "torquetrack-ts3ph.firebaseapp.com",
+  projectId: "torquetrack-ts3ph",
+  storageBucket: "torquetrack-ts3ph.firebasestorage.app",
+  messagingSenderId: "572902936608",
+  appId: "1:572902936608:web:fd25063f0707df5e68ec45"
 };
-
 // A check to see if all required Firebase config values are present and not placeholders.
 const isFirebaseConfigValid =
   firebaseConfig.apiKey &&
   firebaseConfig.authDomain &&
   firebaseConfig.projectId &&
-  !firebaseConfig.apiKey.includes("AIzaSyA") && // A more direct check for placeholder keys
+  !firebaseConfig.apiKey.includes("AIzaSyAUdpkhWz2NjWXsn5KamJyYzArVp7szA5Q") && // A more direct check for placeholder keys
   !firebaseConfig.projectId.includes("torquetrack-ts3ph");
 
 let app: FirebaseApp;
