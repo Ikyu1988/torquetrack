@@ -18,7 +18,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../../../../../components/ui/card";
 import Link from "next/link";
 import { ArrowLeft, UserCheck } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import { useToast } from "../../../../../../hooks/use-toast";
 import { useRouter, useParams } from "next/navigation";
 import type { Customer } from "@/types";
 import { useEffect, useState } from "react";
