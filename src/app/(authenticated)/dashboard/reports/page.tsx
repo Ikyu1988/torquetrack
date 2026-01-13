@@ -2,16 +2,16 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../../../components/ui/card";
+import { Button } from "../../../../components/ui/button";
 import { FileText, BarChart2, DollarSign, Download, AlertTriangle, ShoppingBag, ClipboardList } from "lucide-react";
-import { DatePicker } from "@/components/ui/date-picker";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Separator } from "@/components/ui/separator";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { useToast } from "@/hooks/use-toast";
-import type { JobOrder, Customer, Mechanic, Part, Service, Payment, ShopSettings, JobOrderServiceItem, CommissionType, JobOrderStatus, SalesOrder, SalesOrderStatus, SalesOrderItem } from "@/types";
-import { JOB_ORDER_STATUS_OPTIONS, SALES_ORDER_STATUS_OPTIONS, COMMISSION_TYPES, PAYMENT_STATUSES } from "@/lib/constants";
+import { DatePicker } from "../../../../components/ui/date-picker";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../../../components/ui/select";
+import { Separator } from "../../../../components/ui/separator";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../../../components/ui/table";
+import { useToast } from "../../../../hooks/use-toast";
+import type { JobOrder, Customer, Mechanic, Part, Service, Payment, ShopSettings, JobOrderServiceItem, CommissionType, JobOrderStatus, SalesOrder, SalesOrderStatus, SalesOrderItem } from "../../../../types";
+import { JOB_ORDER_STATUS_OPTIONS, SALES_ORDER_STATUS_OPTIONS, COMMISSION_TYPES, PAYMENT_STATUSES } from "../../../../lib/constants";
 import { format, startOfMonth } from "date-fns";
 
 const convertToCSV = (data: any[], headers?: string[]): string => {

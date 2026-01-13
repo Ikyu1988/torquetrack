@@ -1,21 +1,21 @@
 
 "use client";
 
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { useToast } from "@/hooks/use-toast";
-import type { JobOrder, Customer, Motorcycle, Mechanic, Payment, ShopSettings, JobOrderServiceItem } from "@/types";
+import { Button } from "../../../../../components/ui/button";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "../../../../../components/ui/card";
+import { useToast } from "../../../../../hooks/use-toast";
+import type { JobOrder, Customer, Motorcycle, Mechanic, Payment, ShopSettings, JobOrderServiceItem } from "../../../../../types";
 import { ArrowLeft, ClipboardList, Edit, Printer, Send, UserCog, PackageSearch, Wrench, CreditCard, PlusCircle } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import React, { useEffect, useState, useMemo, useCallback } from "react";
 import { format } from "date-fns";
-import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
-import { cn } from "@/lib/utils";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { AddPaymentDialog } from "@/components/dashboard/job-orders/AddPaymentDialog";
-import { JOB_ORDER_STATUSES, PAYMENT_STATUSES } from "@/lib/constants";
+import { Badge } from "../../../../../components/ui/badge";
+import { Separator } from "../../../../../components/ui/separator";
+import { cn } from "../../../../../lib/utils";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../../../../components/ui/table";
+import { AddPaymentDialog } from "../../../../../components/dashboard/job-orders/AddPaymentDialog";
+import { JOB_ORDER_STATUSES, PAYMENT_STATUSES } from "../../../../../lib/constants";
 
 if (typeof window !== 'undefined' && !(window as any).__paymentStore) {
     (window as any).__paymentStore = {

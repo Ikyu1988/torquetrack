@@ -4,7 +4,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
-import { Button } from "@/components/ui/button";
+import { Button } from "../../../../components/ui/button";
 import {
   Form,
   FormControl,
@@ -13,17 +13,17 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+} from "../../../../components/ui/form";
+import { Input } from "../../../../components/ui/input";
+import { Textarea } from "../../../../components/ui/textarea";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../../../components/ui/card";
 import { Settings as SettingsIcon, Building, DollarSign, Palette, ToggleLeft, Image as ImageIcon, AlertTriangle } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
-import type { ShopSettings, ModuleSettings } from "@/types";
+import { useToast } from "../../../../hooks/use-toast";
+import type { ShopSettings, ModuleSettings } from "../../../../types";
 import { useEffect, useState, useCallback } from "react";
-import { Separator } from "@/components/ui/separator";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
+import { Separator } from "../../../../components/ui/separator";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../../../components/ui/select";
+import { Switch } from "../../../../components/ui/switch";
 
 const moduleSettingsSchema = z.object({
   reportsEnabled: z.boolean().default(true),
@@ -524,4 +524,3 @@ export default function SettingsPage() {
     </div>
   );
 }
-

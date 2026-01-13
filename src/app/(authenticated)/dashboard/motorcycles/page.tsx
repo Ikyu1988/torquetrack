@@ -2,8 +2,8 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../../../components/ui/card";
+import { Button } from "../../../../components/ui/button";
 import { PlusCircle, Bike, Pencil, Trash2 } from "lucide-react";
 import Link from "next/link";
 import {
@@ -13,7 +13,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
+} from "../../../../components/ui/table";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -23,9 +23,9 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { useToast } from "@/hooks/use-toast";
-import type { Motorcycle, Customer } from "@/types";
+} from "../../../../components/ui/alert-dialog";
+import { useToast } from "../../../../hooks/use-toast";
+import type { Motorcycle, Customer } from "../../../../types";
 
 // Initial mock data for motorcycles
 const initialMotorcycles: Motorcycle[] = [
@@ -262,4 +262,3 @@ export default function MotorcyclesPage() {
     </div>
   );
 }
-

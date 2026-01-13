@@ -4,7 +4,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm, useFieldArray } from "react-hook-form";
 import * as z from "zod";
-import { Button } from "@/components/ui/button";
+import { Button } from "../../../../components/ui/button";
 import {
   Form,
   FormControl,
@@ -12,18 +12,18 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+} from "../../../../components/ui/form";
+import { Input } from "../../../../components/ui/input";
+import { Textarea } from "../../../../components/ui/textarea";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../../../components/ui/card";
 import { ShoppingCart, PlusCircle, Trash2, Printer, Eye, ClipboardList } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import { useToast } from "../../../../hooks/use-toast";
 import { useRouter } from "next/navigation";
-import type { SalesOrder, Customer, Part, PaymentMethod, ShopSettings, Payment, SalesOrderItem } from "@/types";
+import type { SalesOrder, Customer, Part, PaymentMethod, ShopSettings, Payment, SalesOrderItem } from "../../../../types";
 import { useEffect, useState, useMemo, useCallback } from "react";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { SALES_ORDER_STATUSES, PAYMENT_STATUSES, PAYMENT_METHOD_OPTIONS } from "@/lib/constants";
-import { Separator } from "@/components/ui/separator";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../../../components/ui/select";
+import { SALES_ORDER_STATUSES, PAYMENT_STATUSES, PAYMENT_METHOD_OPTIONS } from "../../../../lib/constants";
+import { Separator } from "../../../../components/ui/separator";
 import Link from "next/link";
 import {
   Table,
@@ -32,8 +32,8 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
+} from "../../../../components/ui/table";
+import { Badge } from "../../../../components/ui/badge";
 import { format } from "date-fns";
 
 const salesOrderItemSchema = z.object({
@@ -608,4 +608,3 @@ export default function DirectSalesPage() {
     </div>
   );
 }
-

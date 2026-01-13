@@ -2,8 +2,8 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../../../components/ui/card";
+import { Button } from "../../../../components/ui/button";
 import { PlusCircle, Receipt, Pencil, Trash2, Eye, Search } from "lucide-react";
 import Link from "next/link";
 import {
@@ -13,7 +13,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
+} from "../../../../components/ui/table";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -23,14 +23,14 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { useToast } from "@/hooks/use-toast";
-import type { PurchaseOrder, Supplier, ShopSettings, PurchaseOrderStatus, PurchaseOrderItem } from "@/types";
-import { Badge } from "@/components/ui/badge";
+} from "../../../../components/ui/alert-dialog";
+import { useToast } from "../../../../hooks/use-toast";
+import type { PurchaseOrder, Supplier, ShopSettings, PurchaseOrderStatus, PurchaseOrderItem } from "../../../../types";
+import { Badge } from "../../../../components/ui/badge";
 import { format } from "date-fns";
-import { PURCHASE_ORDER_STATUSES, PURCHASE_ORDER_STATUS_OPTIONS, PURCHASE_REQUISITION_STATUSES } from "@/lib/constants";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { PURCHASE_ORDER_STATUSES, PURCHASE_ORDER_STATUS_OPTIONS, PURCHASE_REQUISITION_STATUSES } from "../../../../lib/constants";
+import { Input } from "../../../../components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../../../components/ui/select";
 
 
 const initialPurchaseOrders: PurchaseOrder[] = [
@@ -336,4 +336,3 @@ export default function PurchaseOrdersPage() {
     </div>
   );
 }
-

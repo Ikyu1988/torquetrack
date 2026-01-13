@@ -1,18 +1,18 @@
 
 "use client";
 
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { useToast } from "@/hooks/use-toast";
-import type { GoodsReceipt, PurchaseOrder, Supplier, ShopSettings } from "@/types";
+import { Button } from "../../../../../components/ui/button";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "../../../../../components/ui/card";
+import { useToast } from "../../../../../hooks/use-toast";
+import type { GoodsReceipt, PurchaseOrder, Supplier, ShopSettings } from "../../../../../types";
 import { ArrowLeft, ArchiveRestore, Printer } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState, useMemo } from "react";
 import { format } from "date-fns";
-import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Badge } from "../../../../../components/ui/badge";
+import { Separator } from "../../../../../components/ui/separator";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../../../../components/ui/table";
 
 export default function ViewGoodsReceiptPage() {
   const router = useRouter();

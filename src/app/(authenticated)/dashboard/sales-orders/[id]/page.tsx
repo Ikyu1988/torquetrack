@@ -1,21 +1,21 @@
 
 "use client";
 
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { useToast } from "@/hooks/use-toast";
-import type { SalesOrder, Customer, ShopSettings, Payment, PaymentMethod } from "@/types";
+import { Button } from "../../../../../components/ui/button";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "../../../../../components/ui/card";
+import { useToast } from "../../../../../hooks/use-toast";
+import type { SalesOrder, Customer, ShopSettings, Payment, PaymentMethod } from "../../../../../types";
 import { ArrowLeft, ShoppingCart, Edit, Printer, Send, PlusCircle } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import React, { useEffect, useState, useMemo, useCallback } from "react";
 import { format } from "date-fns";
-import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
-import { cn } from "@/lib/utils";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { SALES_ORDER_STATUSES, PAYMENT_STATUSES } from "@/lib/constants";
-import { AddSalesOrderPaymentDialog } from "@/components/dashboard/sales-orders/AddSalesOrderPaymentDialog";
+import { Badge } from "../../../../../components/ui/badge";
+import { Separator } from "../../../../../components/ui/separator";
+import { cn } from "../../../../../lib/utils";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../../../../components/ui/table";
+import { SALES_ORDER_STATUSES, PAYMENT_STATUSES } from "../../../../../lib/constants";
+import { AddSalesOrderPaymentDialog } from "../../../../../components/dashboard/sales-orders/AddSalesOrderPaymentDialog";
 
 export default function ViewSalesOrderPage() {
   const router = useRouter();

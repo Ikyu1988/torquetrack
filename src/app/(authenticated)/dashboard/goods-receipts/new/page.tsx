@@ -4,7 +4,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm, useFieldArray } from "react-hook-form";
 import * as z from "zod";
-import { Button } from "@/components/ui/button";
+import { Button } from "../../../../../components/ui/button";
 import {
   Form,
   FormControl,
@@ -13,20 +13,20 @@ import {
   FormLabel,
   FormMessage,
   FormDescription, // Added FormDescription
-} from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+} from "../../../../../components/ui/form";
+import { Input } from "../../../../../components/ui/input";
+import { Textarea } from "../../../../../components/ui/textarea";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../../../../components/ui/card";
 import Link from "next/link";
 import { ArrowLeft, ArchiveRestore, PlusCircle, Trash2 } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import { useToast } from "../../../../../hooks/use-toast";
 import { useRouter, useSearchParams } from "next/navigation";
-import type { GoodsReceipt, GoodsReceiptItem, PurchaseOrder, Part, ShopSettings, Supplier, PurchaseOrderItem } from "@/types";
+import type { GoodsReceipt, GoodsReceiptItem, PurchaseOrder, Part, ShopSettings, Supplier, PurchaseOrderItem } from "../../../../../types";
 import { useEffect, useState, useMemo, useCallback } from "react";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Separator } from "@/components/ui/separator";
-import { DatePicker } from "@/components/ui/date-picker";
-import { GOODS_RECEIPT_STATUSES, GOODS_RECEIPT_STATUS_OPTIONS, PURCHASE_ORDER_STATUSES } from "@/lib/constants";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../../../../components/ui/select";
+import { Separator } from "../../../../../components/ui/separator";
+import { DatePicker } from "../../../../../components/ui/date-picker";
+import { GOODS_RECEIPT_STATUSES, GOODS_RECEIPT_STATUS_OPTIONS, PURCHASE_ORDER_STATUSES } from "../../../../../lib/constants";
 
 const goodsReceiptItemSchema = z.object({
   id: z.string(), // Corresponds to PurchaseOrderItem.id
@@ -379,4 +379,3 @@ export default function NewGoodsReceiptPage() {
     </div>
   );
 }
-

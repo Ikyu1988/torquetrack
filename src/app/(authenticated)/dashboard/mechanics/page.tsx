@@ -2,8 +2,8 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../../../components/ui/card";
+import { Button } from "../../../../components/ui/button";
 import { PlusCircle, UserCog, Pencil, Trash2, Search } from "lucide-react";
 import Link from "next/link";
 import {
@@ -13,7 +13,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
+} from "../../../../components/ui/table";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -23,11 +23,11 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { useToast } from "@/hooks/use-toast";
-import type { Mechanic } from "@/types";
-import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
+} from "../../../../components/ui/alert-dialog";
+import { useToast } from "../../../../hooks/use-toast";
+import type { Mechanic } from "../../../../types";
+import { Badge } from "../../../../components/ui/badge";
+import { Input } from "../../../../components/ui/input";
 
 const initialMechanics: Mechanic[] = [
   {
@@ -268,4 +268,3 @@ export default function MechanicsPage() {
     </div>
   );
 }
-

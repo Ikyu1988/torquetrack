@@ -4,7 +4,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm, useFieldArray } from "react-hook-form";
 import * as z from "zod";
-import { Button } from "@/components/ui/button";
+import { Button } from "../../../../../components/ui/button";
 import {
   Form,
   FormControl,
@@ -12,19 +12,19 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+} from "../../../../../components/ui/form";
+import { Input } from "../../../../../components/ui/input";
+import { Textarea } from "../../../../../components/ui/textarea";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../../../../components/ui/card";
 import Link from "next/link";
 import { ArrowLeft, FilePlus, PlusCircle, Trash2 } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import { useToast } from "../../../../../hooks/use-toast";
 import { useRouter } from "next/navigation";
-import type { PurchaseRequisition, Part, PurchaseRequisitionItem, ShopSettings } from "@/types";
+import type { PurchaseRequisition, Part, PurchaseRequisitionItem, ShopSettings } from "../../../../../types";
 import { useEffect, useState, useMemo } from "react";
-import { Combobox, type ComboboxOption } from "@/components/ui/combobox"; // Updated import
-import { Separator } from "@/components/ui/separator";
-import { PURCHASE_REQUISITION_STATUSES } from "@/lib/constants";
+import { Combobox, type ComboboxOption } from "../../../../../components/ui/combobox"; // Updated import
+import { Separator } from "../../../../../components/ui/separator";
+import { PURCHASE_REQUISITION_STATUSES } from "../../../../../lib/constants";
 
 const requisitionItemSchema = z.object({
   id: z.string(),

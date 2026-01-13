@@ -1,19 +1,19 @@
 
 "use client";
 
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { useToast } from "@/hooks/use-toast";
-import type { PurchaseRequisition, ShopSettings, Part } from "@/types";
+import { Button } from "../../../../../components/ui/button";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "../../../../../components/ui/card";
+import { useToast } from "../../../../../hooks/use-toast";
+import type { PurchaseRequisition, ShopSettings, Part } from "../../../../../types";
 import { ArrowLeft, FilePlus, Edit, Printer, ShoppingCart } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState, useMemo } from "react";
 import { format } from "date-fns";
-import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { PURCHASE_REQUISITION_STATUSES } from "@/lib/constants";
+import { Badge } from "../../../../../components/ui/badge";
+import { Separator } from "../../../../../components/ui/separator";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../../../../components/ui/table";
+import { PURCHASE_REQUISITION_STATUSES } from "../../../../../lib/constants";
 
 export default function ViewPurchaseRequisitionPage() {
   const router = useRouter();

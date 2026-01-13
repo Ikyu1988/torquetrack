@@ -4,7 +4,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm, Controller, useFieldArray } from "react-hook-form";
 import * as z from "zod";
-import { Button } from "@/components/ui/button";
+import { Button } from "../../../../../../components/ui/button";
 import {
   Form,
   FormControl,
@@ -12,20 +12,20 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+} from "../../../../../../components/ui/form";
+import { Input } from "../../../../../../components/ui/input";
+import { Textarea } from "../../../../../../components/ui/textarea";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../../../../../components/ui/card";
 import Link from "next/link";
 import { ArrowLeft, ClipboardList, PlusCircle, Trash2 } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import { useToast } from "../../../../../../hooks/use-toast";
 import { useRouter, useParams } from "next/navigation";
-import type { JobOrder, Customer, Motorcycle, Service, Part, Mechanic, JobOrderServiceItem, JobOrderPartItem, ShopSettings } from "@/types";
+import type { JobOrder, Customer, Motorcycle, Service, Part, Mechanic, JobOrderServiceItem, JobOrderPartItem, ShopSettings } from "../../../../../../types";
 import { useEffect, useState, useMemo } from "react";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { DatePicker } from "@/components/ui/date-picker";
-import { JOB_ORDER_STATUS_OPTIONS, PAYMENT_STATUS_OPTIONS } from "@/lib/constants";
-import { Separator } from "@/components/ui/separator";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../../../../../components/ui/select";
+import { DatePicker } from "../../../../../../components/ui/date-picker";
+import { JOB_ORDER_STATUS_OPTIONS, PAYMENT_STATUS_OPTIONS } from "../../../../../../lib/constants";
+import { Separator } from "../../../../../../components/ui/separator";
 
 const jobOrderServiceItemSchema = z.object({
   id: z.string(),

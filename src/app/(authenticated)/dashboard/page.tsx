@@ -1,14 +1,14 @@
 
 "use client";
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../../components/ui/card";
+import { Button } from "../../../components/ui/button";
 import { FileText, Package, Users, Wrench, ArrowRight, ClipboardList, AlertTriangle, DollarSign, ShoppingCart } from "lucide-react"; 
 import Link from "next/link";
 import Image from "next/image";
 import React, { useEffect, useState, useMemo } from "react";
-import type { JobOrder, Part, Customer, ShopSettings } from "@/types";
-import { JOB_ORDER_STATUSES, PAYMENT_STATUSES } from "@/lib/constants";
+import type { JobOrder, Part, Customer, ShopSettings } from "../../../types";
+import { JOB_ORDER_STATUSES, PAYMENT_STATUSES } from "../../../lib/constants";
 
 interface QuickStat {
   title: string;

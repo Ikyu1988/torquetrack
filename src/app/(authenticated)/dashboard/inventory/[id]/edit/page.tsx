@@ -4,7 +4,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
-import { Button } from "@/components/ui/button";
+import { Button } from "../../../../../../components/ui/button";
 import {
   Form,
   FormControl,
@@ -12,17 +12,17 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+} from "../../../../../../components/ui/form";
+import { Input } from "../../../../../../components/ui/input";
+import { Textarea } from "../../../../../../components/ui/textarea";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../../../../../components/ui/card";
 import Link from "next/link";
 import { ArrowLeft, Package } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import { useToast } from "../../../../../../hooks/use-toast";
 import { useRouter, useParams } from "next/navigation";
-import type { Part, ShopSettings } from "@/types";
+import type { Part, ShopSettings } from "../../../../../../types";
 import { useEffect, useState, useMemo } from "react";
-import { Switch } from "@/components/ui/switch";
+import { Switch } from "../../../../../../components/ui/switch";
 
 const partFormSchema = z.object({
   name: z.string().min(1, { message: "Part name is required." }).max(100),

@@ -19,10 +19,10 @@ import {
   Receipt, // For Purchase Orders
   ArchiveRestore // For Goods Receipts
 } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { AppLogo } from "@/components/layout/AppLogo";
-import { Separator } from "@/components/ui/separator";
+import { cn } from "../../lib/utils";
+import { ScrollArea } from "../../components/ui/scroll-area";
+import { AppLogo } from "../../components/layout/AppLogo";
+import { Separator } from "../../components/ui/separator";
 
 // TODO: This should be dynamically generated based on user role and module settings
 const navItems = [
