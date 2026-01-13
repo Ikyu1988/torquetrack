@@ -1,7 +1,7 @@
-import { Button } from "@/components/ui/button";
+import { Button } from "../components/ui/button";
 import Link from "next/link";
 import Image from "next/image";
-import { AppLogo } from "@/components/layout/AppLogo";
+import { AppLogo } from "../components/layout/AppLogo";
 import { ArrowRight, Settings, Users, Zap } from "lucide-react";
 
 export default function HomePage() {

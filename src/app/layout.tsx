@@ -3,10 +3,10 @@
 
 import type { Metadata } from 'next'; // Still keep for static metadata if possible
 import './globals.css';
-import { Toaster } from "@/components/ui/toaster";
+import { Toaster } from "../components/ui/toaster";
 import { Inter as FontSans, Space_Grotesk as FontHeadline } from 'next/font/google';
-import { cn } from "@/lib/utils";
-import { AuthProvider } from "@/contexts/AuthContext"; // Import AuthProvider
+import { cn } from "../lib/utils";
+import { AuthProvider } from "../contexts/AuthContext"; // Import AuthProvider
 
 const fontSans = FontSans({
   subsets: ["latin"],

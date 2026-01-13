@@ -4,15 +4,15 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+import { Button } from "../../components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
+import { Input } from "../../components/ui/input";
 import Link from "next/link";
 import { ArrowLeft, KeyRound } from "lucide-react";
-import { AppLogo } from "@/components/layout/AppLogo";
-import { auth } from "@/lib/firebase";
+import { AppLogo } from "../../components/layout/AppLogo";
+import { auth } from "../../lib/firebase";
 import { sendPasswordResetEmail } from "firebase/auth";
-import { useToast } from "@/hooks/use-toast";
+import { useToast } from "../../hooks/use-toast";
 import { useState } from "react";
 import {
   Form,
@@ -21,7 +21,7 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from "@/components/ui/form";
+} from "../../components/ui/form";
 
 const formSchema = z.object({
   email: z.string().email({ message: "Please enter a valid email address." }),

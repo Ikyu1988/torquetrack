@@ -2,12 +2,12 @@
 "use client"; 
 
 import React, { useState, useEffect, useCallback } from "react";
-import { AppHeader } from "@/components/layout/AppHeader";
-import { SidebarNav } from "@/components/navigation/SidebarNav";
-import { cn } from "@/lib/utils";
-import { useAuth } from "@/contexts/AuthContext";
+import { AppHeader } from "../../components/layout/AppHeader";
+import { SidebarNav } from "../../components/navigation/SidebarNav";
+import { cn } from "../../lib/utils";
+import { useAuth } from "../../contexts/AuthContext";
 import { useRouter } from "next/navigation";
-import { Skeleton } from "@/components/ui/skeleton"; // For loading state
+import { Skeleton } from "../../components/ui/skeleton"; // For loading state
 
 export default function AuthenticatedLayout({
   children,
@@ -78,4 +78,3 @@ export default function AuthenticatedLayout({
     </div>
   );
 }
-
