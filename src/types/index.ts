@@ -1,6 +1,7 @@
 
-import type { UserRole, JobOrderStatus, PaymentStatus, CommissionType, PaymentMethod as ImportedPaymentMethod, PurchaseRequisitionStatus, PurchaseOrderStatus, /* GoodsReceiptStatus removed from this aliased import */ SalesOrderStatus } from '@/lib/constants';
-export type { GoodsReceiptStatus } from '@/lib/constants'; // Direct re-export for GoodsReceiptStatus
+
+import type { UserRole, JobOrderStatus, PaymentStatus, CommissionType, PaymentMethod as ImportedPaymentMethod, PurchaseRequisitionStatus, PurchaseOrderStatus, /* GoodsReceiptStatus removed from this aliased import */ SalesOrderStatus } from '../lib/constants';
+export type { GoodsReceiptStatus } from '../lib/constants'; // Direct re-export for GoodsReceiptStatus
 
 export type PaymentMethod = ImportedPaymentMethod; // Explicitly re-export the type for PaymentMethod
 

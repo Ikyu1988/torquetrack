@@ -1,3 +1,4 @@
+
 // src/app/layout.tsx
 "use client"; // AuthProvider requires this to be a client component
 

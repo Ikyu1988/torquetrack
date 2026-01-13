@@ -1,14 +1,14 @@
 
 "use client";
 
-import { UserNav } from "@/components/navigation/UserNav";
-import { Button }  from "@/components/ui/button";
+import { UserNav } from "../navigation/UserNav";
+import { Button }  from "../ui/button";
 import { Menu } from "lucide-react";
 import { usePathname } from "next/navigation";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"; // Added SheetHeader, SheetTitle
-import { SidebarNav } from "@/components/navigation/SidebarNav";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "../ui/sheet"; // Added SheetHeader, SheetTitle
+import { SidebarNav } from "../navigation/SidebarNav";
 import { AppLogo } from "./AppLogo";
-import { cn } from "@/lib/utils";
+import { cn } from "../../lib/utils";
 
 export function AppHeader({ toggleSidebar, isSidebarCollapsed }: { toggleSidebar?: () => void, isSidebarCollapsed?: boolean }) {
   const pathname = usePathname();

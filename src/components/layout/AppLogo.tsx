@@ -4,7 +4,7 @@
 import Link from "next/link";
 import { Wrench } from "lucide-react"; 
 import { useEffect, useState, useRef, useCallback } from "react";
-import type { ShopSettings } from "@/types";
+import type { ShopSettings } from "../../../types";
 
 export function AppLogo({ collapsed } : { collapsed?: boolean }) {
   const [shopName, setShopName] = useState("TorqueTrack");
